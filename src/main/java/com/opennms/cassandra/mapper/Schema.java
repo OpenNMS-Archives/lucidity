@@ -27,10 +27,8 @@ import com.google.common.collect.Maps;
 
 // FIXME: support annotated methods, as well as fields.
 // FIXME: column names should default to property name when name is not set.
-// FIXME: something to output DDL.
 // FIXME: fromObject should validate field types against CQL_TYPES.
 // FIXME: add collection types to CQL_TYPES.
-// FIXME: do away with fromClass(), and create ctor(Class<?>) ?
 
 /**
  * Groks schema structure from an annotated Java object.

@@ -51,9 +51,9 @@ import com.google.common.collect.Sets.SetView;
 // FIXME: Reflection errors shouldn't be propagated as RuntimeExceptions (use custom exception).
 // FIXME: Cache schemas?
 // FIXME: Should create() set the generated ID on the object?
-// FIXME: create() should fail if ID set?
-// FIXME: Support collection types (hint: parametization).
+// FIXME: Support collection types.
 // FIXME: delete() should remove from instance cache as well.
+// FIXME: replace instances of Class.newInstance() with method from Util
 
 public class CassandraStorage implements Storage {
 
@@ -68,7 +68,6 @@ public class CassandraStorage implements Storage {
 
         Cluster cluster = Cluster.builder().withPort(port).addContactPoint(host).build();
         m_session = cluster.connect(keyspace);
-        // m_session = cluster.connect();
 
     }
 
