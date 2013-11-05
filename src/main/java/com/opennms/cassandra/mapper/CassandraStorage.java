@@ -125,6 +125,12 @@ public class CassandraStorage implements Storage {
 
             for (Object item : (Collection<?>) relations) {
                 UUID relationID = (UUID) s.getIDValue(item);
+
+                if (relationID == null) {
+                    throw new IllegalStateException(
+                            "encountered relation with null ID property (entity not persisted?)");
+                }
+
                 String joinTable = format("%s_%s", schema.getTableName(), s.getTableName());
 
                 batch.add(
