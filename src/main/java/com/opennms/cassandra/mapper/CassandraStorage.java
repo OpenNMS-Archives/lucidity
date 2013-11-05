@@ -40,6 +40,7 @@ import com.datastax.driver.core.querybuilder.Batch;
 import com.datastax.driver.core.querybuilder.Insert;
 import com.datastax.driver.core.querybuilder.QueryBuilder;
 import com.datastax.driver.core.querybuilder.Update;
+import com.google.common.base.Optional;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
 import com.google.common.collect.Sets.SetView;
@@ -234,13 +235,12 @@ public class CassandraStorage implements Storage {
             }
         }
 
-        System.err.println(batchStatement);
         m_session.execute(batchStatement);
 
     }
 
     @Override
-    public <T> T read(Class<T> cls, UUID id) throws StorageException {
+    public <T> Optional<T> read(Class<T> cls, UUID id) {
 
         T instance;
         try {
@@ -256,8 +256,7 @@ public class CassandraStorage implements Storage {
         Row row = results.one();
 
         checkState(results.isExhausted(), "query returned more than one row");
-        if (row == null) throw new StorageException(format("%s not found", id.toString()));
-
+        if (row == null) return Optional.absent();
 
         Util.setFieldValue(schema.getIDField(), instance, row.getUUID(schema.getIDName()));
 
@@ -283,7 +282,7 @@ public class CassandraStorage implements Storage {
 
         cacheObject(instance);
 
-        return instance;
+        return Optional.of(instance);
     }
 
     private void cacheObject(Object obj) {
@@ -386,7 +385,7 @@ public class CassandraStorage implements Storage {
     }
 
     @Override
-    public <T> T read(Class<T> cls, String indexedName, Object value) throws StorageException {
+    public <T> Optional<T> read(Class<T> cls, String indexedName, Object value) {
 
         T instance;
         try {
@@ -402,7 +401,7 @@ public class CassandraStorage implements Storage {
         Row row = results.one();
 
         checkState(results.isExhausted(), "query returned more than one row");
-        if (row == null) throw new StorageException(format("not found"));
+        if (row == null) Optional.absent();
         
         return read(cls, row.getUUID(format("%s_id", schema.getTableName())));
     }

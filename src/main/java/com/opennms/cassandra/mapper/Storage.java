@@ -2,12 +2,14 @@ package com.opennms.cassandra.mapper;
 
 import java.util.UUID;
 
+import com.google.common.base.Optional;
+
 // FIXME: Javadoc all around.
 
 public interface Storage {
     UUID create(Object obj);
     void update(Object obj);
-    <T> T read(Class<T> cls, UUID id) throws StorageException;
-    <T> T read(Class<T> cls, String indexedName, Object value) throws StorageException;
+    <T> Optional<T> read(Class<T> cls, UUID id);
+    <T> Optional<T> read(Class<T> cls, String indexedName, Object value);
     void delete(Object obj);
 }
