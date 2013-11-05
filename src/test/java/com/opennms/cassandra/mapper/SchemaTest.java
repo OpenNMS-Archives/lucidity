@@ -29,6 +29,13 @@ public class SchemaTest {
         }
     }
 
+    @Entity
+    private class InvalidConstructor {
+        InvalidConstructor(String argument) {
+
+        }
+    }
+
     @Test
     public void test() {
         System.err.println(Schema.fromClass(Point.class));
@@ -42,4 +49,8 @@ public class SchemaTest {
         System.err.println("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~");    
     }
 
+    @Test(expected = IllegalArgumentException.class)
+    public void testNoArgConstructor() {
+        Schema.fromClass(InvalidConstructor.class);
+    }
 }

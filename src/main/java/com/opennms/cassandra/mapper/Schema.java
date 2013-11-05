@@ -25,7 +25,6 @@ import javax.persistence.Table;
 import com.google.common.base.Throwables;
 import com.google.common.collect.Maps;
 
-// FIXME: should this validate that a nullary constructor exists?.
 // FIXME: validate the Id is of type UUID.
 // FIXME: support annotated methods, as well as fields.
 // FIXME: column names should default to property name when name is not set.
@@ -46,6 +45,7 @@ class Schema {
     static final Class<? extends Annotation> ID = Id.class;
     static final Class<? extends Annotation> ONE_TO_MANY = OneToMany.class;
     static final Class<? extends Annotation> INDEX = Index.class;
+    static final Class<? extends Annotation> TABLE = Table.class;
     
     static final String DEFAULT_ID_NAME = "id";
     static final Map<Class<?>, String> CQL_TYPES = Maps.newHashMap();
@@ -159,9 +159,13 @@ class Schema {
     static Schema fromClass(Class<?> cls) {
         checkNotNull(cls, "object reference argument");
 
+        if (!Util.getNoArgConstructor(cls).isPresent()) {
+            throw new IllegalArgumentException("Entities are required to have a no-arg constructor.");
+        }
+
         String tableName = cls.getSimpleName();
 
-        if (cls.isAnnotationPresent(Table.class)) {
+        if (cls.isAnnotationPresent(TABLE)) {
             Table table = cls.getAnnotation(Table.class);
             if (!table.name().isEmpty()) {
                 tableName = table.name();
