@@ -8,6 +8,8 @@ import javax.persistence.Entity;
 import javax.persistence.Id;
 import javax.persistence.Table;
 
+import com.google.common.base.Objects;
+
 
 @Entity
 @Table(name = "addresses")
@@ -70,6 +72,16 @@ class Address {
     @Override
     public String toString() {
         return String.format("%s[%s, %s, %s]", getClass().getSimpleName(), getStreet(), getCity(), getZipcode());
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hashCode(getId(), getStreet(), getCity(), getZipcode());
+    }
+
+    @Override
+    public boolean equals(Object other) {
+        return hashCode() == ((Address) other).hashCode();
     }
 
 }

@@ -231,12 +231,20 @@ public class CassandraStorage implements Storage {
             String joinTable = format("%s_%s", schema.getTableName(), s.getTableName());
 
             for (Object o : toInsert) {
+                if (s.getIDValue(o) == null) {
+                    throw new IllegalStateException(
+                            "encountered relation with null ID property (entity not persisted?)");
+                }
                 batchStatement.add(insertInto(joinTable).value(
                         joinColumnName(schema.getTableName()),
                         schema.getIDValue(object)).value(joinColumnName(s.getTableName()), s.getIDValue(o)));
             }
 
             for (Object o : toRemove) {
+                if (s.getIDValue(o) == null) {
+                    throw new IllegalStateException(
+                            "encountered relation with null ID property (entity not persisted?)");
+                }
                 batchStatement.add(QueryBuilder.delete().from(joinTable).where(
                         eq(joinColumnName(schema.getTableName()), schema.getIDValue(object))).and(
                         eq(joinColumnName(s.getTableName()), s.getIDValue(o))));
@@ -281,7 +289,13 @@ public class CassandraStorage implements Storage {
 
             for (Row r : m_session.execute(statement)) {
                 UUID u = r.getUUID(joinColumnName(s.getTableName()));
-                relations.add(read(s.getObjectType(), u));
+
+                Optional<?> joined = read(s.getObjectType(), u);
+
+                // XXX: This will silently ignore negative hits, is that what we want?
+                if (joined.isPresent()) {
+                    relations.add(read(s.getObjectType(), u).get());
+                }
             }
 
             Util.setFieldValue(entry.getKey(), instance, relations);

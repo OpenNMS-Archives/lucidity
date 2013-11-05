@@ -2,11 +2,11 @@ package com.opennms.cassandra.mapper;
 
 
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
-import java.util.Arrays;
 import java.util.Date;
+import java.util.Set;
 import java.util.UUID;
 
 import org.junit.Before;
@@ -14,6 +14,7 @@ import org.junit.Test;
 
 import com.google.common.base.Optional;
 import com.google.common.collect.Lists;
+import com.google.common.collect.Sets;
 
 
 // FIXME: Ensure tests cover properties of all supported types.
@@ -38,7 +39,7 @@ public class CassandraStorageTestITCase {
         u.setLastUpdated(System.currentTimeMillis());
         u.setTemperature(98.6);
         u.setValidated(true);
-        u.setAddresses(Arrays.asList(addresses));
+        u.setAddresses(Lists.newArrayList(addresses));
 
         m_sampleAddresses = addresses;
         m_sampleUser = u;
@@ -48,7 +49,7 @@ public class CassandraStorageTestITCase {
     }
 
     @Test
-    public void testCreate() throws StorageException {
+    public void testCreate() {
 
         // Persist associated addresses
         for (Address a : m_sampleAddresses) {
@@ -76,7 +77,7 @@ public class CassandraStorageTestITCase {
     }
 
     @Test
-    public void testUpdate() throws StorageException {
+    public void testUpdate() {
 
         User user = new User("Eric", "Evans", "eevans@opennms.com");
         user.setId(m_storage.create(user));
@@ -92,16 +93,14 @@ public class CassandraStorageTestITCase {
     }
 
     @Test
-    public void testUpdateNoDiff() throws StorageException {
+    public void testUpdateNoDiff() {
 
         User user = new User("Eric", "Evans", "eevans@opennms.com");
-        UUID id = m_storage.create(user);
-
-        user.setId(id);
+        user.setId(m_storage.create(user));
 
         m_storage.update(user);
 
-        User read = get(m_storage.read(User.class, id));
+        User read = get(m_storage.read(User.class, user.getId()));
 
         assertEquals(user.getEmail(), read.getEmail());
         assertEquals(user.getSurname(), read.getSurname());
@@ -109,73 +108,104 @@ public class CassandraStorageTestITCase {
 
     }
 
-    @Test(expected = StorageException.class)
-    public void testDelete() throws StorageException {
+    @Test
+    public void testDelete() {
 
+        // Write, read, verify presence.
         UUID id = m_storage.create(new User("Eric", "Evans", "eevans@opennms.com"));
-        User read = get(m_storage.read(User.class, id));
-        assertNotNull(read);
+        Optional<User> read = m_storage.read(User.class, id);
 
-        m_storage.delete(read);
+        assertTrue(read.isPresent());
 
-        read = get(m_storage.read(User.class, id));
+        // Delete, verify absence.
+        m_storage.delete(read.get());
 
-    }
-
-    @Test
-    public void testCreateWithOneToMany() throws StorageException {
-
-        Address address0 = new Address("Dove Flight", "San Antonio", "78250");
-        Address address1 = new Address("Pecan Street", "San Antonio", "78205");
-        address0.setId(m_storage.create(address0));
-        address1.setId(m_storage.create(address1));
-
-        User user = new User("Eric", "Evans", "eevans@opennms.com");
-        user.setAddresses(Lists.newArrayList(address0, address1));
-
-        UUID userID = m_storage.create(user);
-
-        System.err.println(m_storage.read(User.class, userID));
+        assertFalse(m_storage.read(User.class, id).isPresent());
 
     }
 
     @Test
-    public void testUpdateWithOneToMany() throws StorageException {
+    public void testCreateOneToMany() {
 
-        Address address0 = new Address("Dove Flight", "San Antonio", "78250");
-        Address address1 = new Address("Pecan Street", "San Antonio", "78205");
-        address0.setId(m_storage.create(address0));
-        address1.setId(m_storage.create(address1));
+        persistSampleUser();
 
-        User user = new User("Eric", "Evans", "eevans@opennms.com");
-        user.setAddresses(Lists.newArrayList(address0, address1));
+        User read = get(m_storage.read(User.class, m_sampleUser.getId()));
 
-        UUID userID = m_storage.create(user);
+        Set<Address> past = Sets.newHashSet(m_sampleUser.getAddresses());
+        Set<Address> present = Sets.newHashSet(read.getAddresses());
+        assertEquals(past, present);
 
-        User read = get(m_storage.read(User.class, userID));
-        read.getAddresses().remove(read.getAddresses().iterator().next());
+    }
+
+    @Test
+    public void testUpdateWithOneToMany() {
+
+        persistSampleUser();
+
+        // Persist an additional address, re-read, and ensure present.
+        Address added = new Address("Sunset Blvd", "Los Angeles", "90069");
+        added.setId(m_storage.create(added));
+
+        m_sampleUser.getAddresses().add(added);
+        m_storage.update(m_sampleUser);
+
+        User read = get(m_storage.read(User.class, m_sampleUser.getId()));
+
+        assertTrue(read.getAddresses().contains(added));
+
+        // Remove one address, re-read, and ensure absent.
+        Address removed = m_sampleAddresses[0];
+        read.getAddresses().remove(removed);
         m_storage.update(read);
 
-        System.err.println(m_storage.read(User.class, userID));
+        read = get(m_storage.read(User.class, m_sampleUser.getId()));
+
+        assertFalse(read.getAddresses().contains(removed));
+
+    }
+
+    @Test(expected = IllegalStateException.class)
+    public void testUpdateWithUnpersistedRelations() {
+
+        persistSampleUser();
+
+        // Update with an unpersisted address (should except).
+        m_sampleUser.getAddresses().add(new Address("Sunset Blvd", "Los Angeles", "90069"));
+
+        m_storage.update(m_sampleUser);
 
     }
 
     @Test
-    public void testWithIndexedColumn() throws StorageException {
+    public void testWithIndexedColumn() {
 
-        User user = new User("Eric", "Evans", "eevans@opennms.com");
-        user.setAge(25);
-        user.setLastUpdated(System.currentTimeMillis());
-        user.setCreated(new Date());
-        user.setTemperature(98.6);
-        user.setValidated(true);
+        persistSampleUser();
 
-        UUID id = m_storage.create(user);
+        User read = get(m_storage.read(User.class, "email", m_sampleUser.getEmail()));
 
-        User read = get(m_storage.read(User.class, "email", "eevans@opennms.com"));
+        assertEquals(m_sampleUser.getId(), read.getId());
+        assertEquals(m_sampleUser.getEmail(), read.getEmail());
 
-        assertEquals(id, read.getId());
+    }
+    
+    @Test
+    public void testUpdateIndexedColumn() {
 
+        persistSampleUser();
+
+        m_sampleUser.setEmail("root@matrix.com");
+        m_storage.update(m_sampleUser);
+
+        User read = get(m_storage.read(User.class, "email", m_sampleUser.getEmail()));
+
+        assertEquals(m_sampleUser.getId(), read.getId());
+        assertEquals(m_sampleUser.getEmail(), read.getEmail());
+
+    }
+
+    private void persistSampleUser() {
+        for (Address a : m_sampleAddresses) a.setId(m_storage.create(a));
+        m_sampleUser.setId(m_storage.create(m_sampleUser));
     }
 
     private <T> T get(Optional<T> optional) {
