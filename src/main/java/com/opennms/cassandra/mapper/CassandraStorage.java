@@ -144,6 +144,8 @@ public class CassandraStorage implements Storage {
 
         m_session.execute(batch);
 
+        cacheInstance(object);
+
         return id;
     }
 
@@ -286,19 +288,20 @@ public class CassandraStorage implements Storage {
 
         }
 
-        cacheObject(instance);
+        cacheInstance(instance);
 
         return Optional.of(instance);
     }
 
-    private void cacheObject(Object obj) {
+    private void cacheInstance(Object obj) {
         Schema schema = getSchema(obj);
         Record record = new Record(schema.getIDValue(obj));
         for (String columnName : schema.getColumns().keySet()) {
             record.putColumn(columnName, schema.getColumnValue(columnName, obj));
         }
         for (Field f : schema.getOneToManys().keySet()) {
-            record.putOneToMany(f, Lists.newArrayList((Collection<?>)Util.getFieldValue(f, obj)));
+            Collection<?> relations = (Collection<?>) Util.getFieldValue(f, obj);
+            record.putOneToMany(f, (relations != null) ? Lists.newArrayList(relations) : null);
         }
         m_objectCache.put(System.identityHashCode(obj), record);
     }
