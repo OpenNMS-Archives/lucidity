@@ -1,5 +1,19 @@
-mapper
-======
+Cassandra Object Mapper
+=======================
+
+Synopsis
+--------
+
+    // Creating
+    Storage storage = new CassandraStorage("localhost", 9042, "keyspace");
+    User user = new User(username, firstName, lastName);
+    
+    storage.create(user);
+    
+    // Reading
+    User user = storage.read(User.class, id);
+    
+
 
  * You must have a no arg constructor.
  * Supported `javax.persistence` annotations: `Id`, `Column`, `OneToMany`
