@@ -25,7 +25,6 @@ import javax.persistence.Table;
 import com.google.common.base.Throwables;
 import com.google.common.collect.Maps;
 
-// FIXME: validate the Id is of type UUID.
 // FIXME: support annotated methods, as well as fields.
 // FIXME: column names should default to property name when name is not set.
 // FIXME: something to output DDL.
@@ -96,8 +95,8 @@ class Schema {
         return m_idField;
     }
 
-    Object getIDValue(Object obj) {
-        return Util.getFieldValue(m_idField, obj);
+    UUID getIDValue(Object obj) {
+        return (UUID)Util.getFieldValue(m_idField, obj);
     }
 
     Map<String, Field> getColumns() {
@@ -115,6 +114,7 @@ class Schema {
     String toDDL() {
 
         StringBuilder sb = new StringBuilder();
+
         sb.append("CREATE TABLE ").append(getTableName()).append(" (").append(getIDName()).append(" uuid PRIMARY KEY");
 
         for (Map.Entry<String, Field> entry : getColumns().entrySet()) {
@@ -192,7 +192,12 @@ class Schema {
                     idName = DEFAULT_ID_NAME;
                 }
 
+                if (!f.getType().equals(UUID.class)) {
+                    throw new IllegalArgumentException(format("@%s must be of type UUID", ID.getCanonicalName()));
+                }
+
                 idField = f;
+
             }
             // Column annotated fields
             else if (f.isAnnotationPresent(COLUMN)) {
