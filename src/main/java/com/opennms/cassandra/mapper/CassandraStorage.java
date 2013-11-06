@@ -73,8 +73,21 @@ public class CassandraStorage implements Storage {
         return Schema.fromClass(object.getClass());
     }
 
+    private com.datastax.driver.core.ConsistencyLevel getSessionConsistencyLevel(Session<?> session) {
+        return getDriverConsistencyLevel(session.getConsistencyLevel());
+    }
+    
+    private com.datastax.driver.core.ConsistencyLevel getDriverConsistencyLevel(ConsistencyLevel cl) {
+        return com.datastax.driver.core.ConsistencyLevel.fromCode(cl.getDriverCode());
+    }
+
     @Override
     public <T> Session<T> create(T object) {
+        return create(object, Session.DEFAULT_CONSISTENCY_LEVEL);
+    }
+    
+    @Override
+    public <T> Session<T> create(T object, ConsistencyLevel consistency) {
 
         checkNotNull(object, "object argument");
         checkArgument(
@@ -139,21 +152,22 @@ public class CassandraStorage implements Storage {
 
         }
 
+        batch.setConsistencyLevel(getDriverConsistencyLevel(consistency));
         m_session.execute(batch);
 
         Util.setFieldValue(schema.getIDField(), object, id);
         
-        return cacheSession(new Session<T>(object));
+        return cacheSession(new Session<T>(object).setConsistencyLevel(consistency));
     }
 
     @Override
-    public <T> void update(Session<T> reference) {
+    public <T> void update(Session<T> session) {
 
-        Object object = reference.get();
+        Object object = session.get();
 
         Schema schema = getSchema(object);
         boolean needsUpdate = false;
-        Record record = m_objectCache.get(reference.getID());
+        Record record = m_objectCache.get(session.getID());
         
         Update updateStatement = QueryBuilder.update(schema.getTableName());
         Batch batchStatement = batch();
@@ -250,12 +264,18 @@ public class CassandraStorage implements Storage {
             }
         }
 
+        batchStatement.setConsistencyLevel(getSessionConsistencyLevel(session));
         m_session.execute(batchStatement);
 
     }
 
     @Override
     public <T> Session<T> read(Class<T> cls, UUID id) {
+        return read(cls, id, Session.DEFAULT_CONSISTENCY_LEVEL);
+    }
+    
+    @Override
+    public <T> Session<T> read(Class<T> cls, UUID id, ConsistencyLevel consistency) {
 
         T instance;
         try {
@@ -267,6 +287,7 @@ public class CassandraStorage implements Storage {
 
         Schema schema = getSchema(instance);
         Statement selectStatement = select().from(schema.getTableName()).where(eq(schema.getIDName(), id));
+        selectStatement.setConsistencyLevel(getDriverConsistencyLevel(consistency));
         ResultSet results = m_session.execute(selectStatement);
         Row row = results.one();
 
@@ -285,6 +306,7 @@ public class CassandraStorage implements Storage {
             Collection<Object> relations = Lists.newArrayList();
             String joinTable = format("%s_%s", schema.getTableName(), s.getTableName());
             Statement statement = select().from(joinTable).where(eq(joinColumnName(schema.getTableName()), id));
+            statement.setConsistencyLevel(getDriverConsistencyLevel(consistency));
 
             for (Row r : m_session.execute(statement)) {
                 UUID u = r.getUUID(joinColumnName(s.getTableName()));
@@ -301,7 +323,7 @@ public class CassandraStorage implements Storage {
 
         }
 
-        return cacheSession(new Session<T>(instance));
+        return cacheSession(new Session<T>(instance).setConsistencyLevel(consistency));
     }
 
     private <T> Session<T> cacheSession(Session<T> sess) {
@@ -380,9 +402,9 @@ public class CassandraStorage implements Storage {
     }
 
     @Override
-    public <T> void delete(Session<T> reference) {
+    public <T> void delete(Session<T> session) {
 
-        T obj = reference.get();
+        T obj = session.get();
         
         Schema schema = getSchema(obj);
         Batch batchStatement = batch(QueryBuilder.delete().from(schema.getTableName())
@@ -406,12 +428,18 @@ public class CassandraStorage implements Storage {
                     .where(eq(joinColumnName(schema.getTableName()), schema.getIDValue(obj))));
         }
 
+        batchStatement.setConsistencyLevel(getSessionConsistencyLevel(session));
         m_session.execute(batchStatement);
 
     }
 
     @Override
     public <T> Session<T> read(Class<T> cls, String indexedName, Object value) {
+        return read(cls, indexedName, value, Session.DEFAULT_CONSISTENCY_LEVEL);
+    }
+    
+    @Override
+    public <T> Session<T> read(Class<T> cls, String indexedName, Object value, ConsistencyLevel consistency) {
 
         T instance;
         try {
@@ -423,13 +451,14 @@ public class CassandraStorage implements Storage {
 
         Schema schema = getSchema(instance);
         Statement selectStatement = select(format("%s_id", schema.getTableName())).from(format("%s_%s_idx", schema.getTableName(), indexedName)).where(eq(indexedName, value));
+        selectStatement.setConsistencyLevel(getDriverConsistencyLevel(consistency));
         ResultSet results = m_session.execute(selectStatement);
         Row row = results.one();
 
         checkState(results.isExhausted(), "query returned more than one row");
         if (row == null) Optional.absent();
         
-        return read(cls, row.getUUID(format("%s_id", schema.getTableName())));
+        return read(cls, row.getUUID(format("%s_id", schema.getTableName())), consistency);
     }
 
 }

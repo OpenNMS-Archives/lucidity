@@ -191,7 +191,7 @@ public class CassandraStorageTestITCase {
         assertEquals(m_sampleUser.getEmail(), read.getEmail());
 
     }
-    
+
     @Test
     public void testUpdateIndexedColumn() {
 
