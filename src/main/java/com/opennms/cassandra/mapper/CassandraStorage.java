@@ -180,26 +180,26 @@ public class CassandraStorage implements Storage {
                 }
             }
         }
-        else {
-            // XXX: Should we be doing this?
-            for (Entry<String, Field> entry : schema.getColumns().entrySet()) {
-                String columnName = entry.getKey();
-                Field f = entry.getValue();
-                
-                needsUpdate = true;
-                updateStatement.with(set(columnName, schema.getColumnValue(columnName, object)));
-                
-                // Add index
-                if (f.isAnnotationPresent(Schema.INDEX)) {
-                    String tableName = format("%s_%s_idx", schema.getTableName(), columnName);
-                    batchStatement.add(
-                            insertInto(tableName)
-                                .value(columnName, Util.getFieldValue(f, object))
-                                .value(format("%s_id", schema.getTableName()), schema.getIDValue(object))
-                    );
-                }
-            }
-        }
+//        else {
+//            // XXX: Should we be doing this?
+//            for (Entry<String, Field> entry : schema.getColumns().entrySet()) {
+//                String columnName = entry.getKey();
+//                Field f = entry.getValue();
+//                
+//                needsUpdate = true;
+//                updateStatement.with(set(columnName, schema.getColumnValue(columnName, object)));
+//                
+//                // Add index
+//                if (f.isAnnotationPresent(Schema.INDEX)) {
+//                    String tableName = format("%s_%s_idx", schema.getTableName(), columnName);
+//                    batchStatement.add(
+//                            insertInto(tableName)
+//                                .value(columnName, Util.getFieldValue(f, object))
+//                                .value(format("%s_id", schema.getTableName()), schema.getIDValue(object))
+//                    );
+//                }
+//            }
+//        }
 
         updateStatement.where(eq(schema.getIDName(), schema.getIDValue(object)));
 
