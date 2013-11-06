@@ -1,23 +1,41 @@
 Cassandra Object Mapper
 =======================
 
-Synopsis
---------
+Example
+-------
 
-    // Creating
-    Storage storage = new CassandraStorage("localhost", 9042, "keyspace");
-    User user = new User(username, firstName, lastName);
+    // User.java
+    import javax.persistence.*;
     
-    storage.create(user);
+    @Entity
+    public class User {
+        @Id
+        @Column(name="userid")
+        private UUID id;
+        
+        @Column(name="given_name")
+        private String givenName;
+        
+        @Column(name="surname")
+        private String surname;
+        
+        ...
+    }
+
+    Storage storage = new CassandraStorage("localhost", 9042, "keyspace");
+    
+    // Creating
+    User user = new User(givenName, lastName);
+    Session<User> session = storage.create(user);
+    
+    // Updating
+    user.setGivenName(name);
+    storage.update(session);
     
     // Reading
-    User user = storage.read(User.class, id);
+    Session<User> session = storage.read(User.class, id);
+    User user = session.get();
     
-
-
- * You must have a no arg constructor.
- * Supported `javax.persistence` annotations: `Id`, `Column`, `OneToMany`
- * Additional annotations:
 
 Limitations
 -----------
