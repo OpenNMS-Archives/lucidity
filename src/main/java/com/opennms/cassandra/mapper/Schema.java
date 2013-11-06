@@ -158,7 +158,7 @@ class Schema {
         checkNotNull(cls, "object reference argument");
 
         if (!Util.getNoArgConstructor(cls).isPresent()) {
-            throw new IllegalArgumentException("Entities are required to have a no-arg constructor.");
+            throw new IllegalArgumentException(format("%s is missing nullary constructor.", cls.getCanonicalName()));
         }
 
         String tableName = cls.getSimpleName();
