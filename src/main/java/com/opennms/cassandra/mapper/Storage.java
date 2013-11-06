@@ -7,7 +7,7 @@ import com.google.common.base.Optional;
 // FIXME: Javadoc all around.
 
 public interface Storage {
-    UUID create(Object obj);
+    void create(Object obj);
     void update(Object obj);
     <T> Optional<T> read(Class<T> cls, UUID id);
     <T> Optional<T> read(Class<T> cls, String indexedName, Object value);

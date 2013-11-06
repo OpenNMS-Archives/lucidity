@@ -50,7 +50,6 @@ import com.google.common.collect.Sets.SetView;
 // FIXME: Wrap java driver exceptions in something (don't expose to consumers of this API).
 // FIXME: Reflection errors shouldn't be propagated as RuntimeExceptions (use custom exception).
 // FIXME: Cache schemas?
-// FIXME: Should create() set the generated ID on the object?
 // FIXME: Support collection types.
 // FIXME: delete() should remove from instance cache as well.
 // FIXME: replace instances of Class.newInstance() with method from Util
@@ -76,7 +75,7 @@ public class CassandraStorage implements Storage {
     }
 
     @Override
-    public UUID create(Object object) {
+    public void create(Object object) {
 
         checkNotNull(object, "object argument");
         checkArgument(
@@ -143,9 +142,9 @@ public class CassandraStorage implements Storage {
 
         m_session.execute(batch);
 
+        Util.setFieldValue(schema.getIDField(), object, id);
         cacheInstance(object);
 
-        return id;
     }
 
     @Override
