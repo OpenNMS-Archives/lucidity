@@ -34,7 +34,6 @@ import java.util.concurrent.ConcurrentMap;
 import com.datastax.driver.core.Cluster;
 import com.datastax.driver.core.ResultSet;
 import com.datastax.driver.core.Row;
-import com.datastax.driver.core.Session;
 import com.datastax.driver.core.Statement;
 import com.datastax.driver.core.querybuilder.Batch;
 import com.datastax.driver.core.querybuilder.Insert;
@@ -56,8 +55,8 @@ import com.google.common.collect.Sets.SetView;
 
 public class CassandraStorage implements Storage {
 
-    private final Session m_session;
-    private ConcurrentMap<Integer, Record> m_objectCache = new ConcurrentHashMap<>();
+    private final com.datastax.driver.core.Session m_session;
+    private ConcurrentMap<UUID, Record> m_objectCache = new ConcurrentHashMap<>();
 
     public CassandraStorage(String host, int port, String keyspace) {
 
@@ -75,7 +74,7 @@ public class CassandraStorage implements Storage {
     }
 
     @Override
-    public void create(Object object) {
+    public <T> Session<T> create(T object) {
 
         checkNotNull(object, "object argument");
         checkArgument(
@@ -143,16 +142,18 @@ public class CassandraStorage implements Storage {
         m_session.execute(batch);
 
         Util.setFieldValue(schema.getIDField(), object, id);
-        cacheInstance(object);
-
+        
+        return cacheSession(new Session<T>(object));
     }
 
     @Override
-    public void update(Object object) {
+    public <T> void update(Session<T> reference) {
+
+        Object object = reference.get();
 
         Schema schema = getSchema(object);
         boolean needsUpdate = false;
-        Record record = m_objectCache.get(System.identityHashCode(object));
+        Record record = m_objectCache.get(reference.getID());
         
         Update updateStatement = QueryBuilder.update(schema.getTableName());
         Batch batchStatement = batch();
@@ -254,7 +255,7 @@ public class CassandraStorage implements Storage {
     }
 
     @Override
-    public <T> Optional<T> read(Class<T> cls, UUID id) {
+    public <T> Session<T> read(Class<T> cls, UUID id) {
 
         T instance;
         try {
@@ -270,7 +271,7 @@ public class CassandraStorage implements Storage {
         Row row = results.one();
 
         checkState(results.isExhausted(), "query returned more than one row");
-        if (row == null) return Optional.absent();
+        if (row == null) return new Session<T>(null);
 
         Util.setFieldValue(schema.getIDField(), instance, row.getUUID(schema.getIDName()));
 
@@ -288,10 +289,10 @@ public class CassandraStorage implements Storage {
             for (Row r : m_session.execute(statement)) {
                 UUID u = r.getUUID(joinColumnName(s.getTableName()));
 
-                Optional<?> joined = read(s.getObjectType(), u);
+                Session<?> joined = read(s.getObjectType(), u);
 
                 // XXX: This will silently ignore negative hits, is that what we want?
-                if (joined.isPresent()) {
+                if (joined.get() != null) {
                     relations.add(read(s.getObjectType(), u).get());
                 }
             }
@@ -300,22 +301,24 @@ public class CassandraStorage implements Storage {
 
         }
 
-        cacheInstance(instance);
-
-        return Optional.of(instance);
+        return cacheSession(new Session<T>(instance));
     }
 
-    private void cacheInstance(Object obj) {
-        Schema schema = getSchema(obj);
-        Record record = new Record(schema.getIDValue(obj));
+    private <T> Session<T> cacheSession(Session<T> sess) {
+        T object = sess.get();
+        Schema schema = getSchema(sess.get());
+
+        Record record = new Record(schema.getIDValue(object));
         for (String columnName : schema.getColumns().keySet()) {
-            record.putColumn(columnName, schema.getColumnValue(columnName, obj));
+            record.putColumn(columnName, schema.getColumnValue(columnName, object));
         }
         for (Field f : schema.getOneToManys().keySet()) {
-            Collection<?> relations = (Collection<?>) Util.getFieldValue(f, obj);
+            Collection<?> relations = (Collection<?>) Util.getFieldValue(f, object);
             record.putOneToMany(f, (relations != null) ? Lists.newArrayList(relations) : null);
         }
-        m_objectCache.put(System.identityHashCode(obj), record);
+        m_objectCache.put(sess.getID(), record);
+        
+        return sess;
     }
 
     private void setColumn(Object obj, String name, Field f, Row data) {
@@ -377,8 +380,10 @@ public class CassandraStorage implements Storage {
     }
 
     @Override
-    public void delete(Object obj) {
+    public <T> void delete(Session<T> reference) {
 
+        T obj = reference.get();
+        
         Schema schema = getSchema(obj);
         Batch batchStatement = batch(QueryBuilder.delete().from(schema.getTableName())
                 .where(eq(schema.getIDName(), schema.getIDValue(obj))));
@@ -406,7 +411,7 @@ public class CassandraStorage implements Storage {
     }
 
     @Override
-    public <T> Optional<T> read(Class<T> cls, String indexedName, Object value) {
+    public <T> Session<T> read(Class<T> cls, String indexedName, Object value) {
 
         T instance;
         try {
