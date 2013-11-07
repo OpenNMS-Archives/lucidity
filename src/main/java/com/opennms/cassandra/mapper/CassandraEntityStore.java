@@ -52,12 +52,12 @@ import com.google.common.collect.Sets.SetView;
 // FIXME: delete() should remove from instance cache as well.
 // FIXME: replace instances of Class.newInstance() with method from Util
 
-public class CassandraStorage implements Storage {
+public class CassandraEntityStore implements EntityStore {
 
     private final com.datastax.driver.core.Session m_session;
     private ConcurrentMap<UUID, Record> m_objectCache = new ConcurrentHashMap<>();
 
-    public CassandraStorage(String host, int port, String keyspace) {
+    public CassandraEntityStore(String host, int port, String keyspace) {
 
         checkNotNull(host, "Cassandra hostname");
         checkNotNull(port, "Cassandra port number");

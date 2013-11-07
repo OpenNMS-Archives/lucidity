@@ -4,7 +4,7 @@ package com.opennms.cassandra.mapper;
 import java.util.UUID;
 
 
-public interface Storage {
+public interface EntityStore {
 
     /**
      * Persist a new object using the default consistency level (see
