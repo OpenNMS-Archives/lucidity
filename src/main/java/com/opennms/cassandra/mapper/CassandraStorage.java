@@ -163,58 +163,40 @@ public class CassandraStorage implements Storage {
     @Override
     public <T> void update(Session<T> session) {
 
+        Record record = m_objectCache.get(session.getID());
+
+        if (record == null) {
+            throw new IllegalStateException("session is invalid");
+        }
+
         Object object = session.get();
 
         Schema schema = getSchema(object);
         boolean needsUpdate = false;
-        Record record = m_objectCache.get(session.getID());
-        
+
         Update updateStatement = QueryBuilder.update(schema.getTableName());
         Batch batchStatement = batch();
 
-        if (record != null) {
-            
-            for (String columnName : schema.getColumns().keySet()) {
+        for (String columnName : schema.getColumns().keySet()) {
 
-                Object past, current;
-                current = schema.getColumnValue(columnName, object);
-                past = record.getColumns().get(columnName);
+            Object past, current;
+            current = schema.getColumnValue(columnName, object);
+            past = record.getColumns().get(columnName);
 
-                if (current != null && !current.equals(past)) {
-                    needsUpdate = true;
-                    updateStatement.with(set(columnName, current));
-                    
-                    // Update index, if applicable
-                    if (schema.getColumns().get(columnName).isAnnotationPresent(INDEX)) {
-                        batchStatement.add(
-                                QueryBuilder.update(format("%s_%s_idx", schema.getTableName(), columnName))
-                                        .with(set(format("%s_id", schema.getTableName()), schema.getIDValue(object)))
-                                        .where(eq(columnName, schema.getColumnValue(columnName, object)))
-                        );
-                    }
+            if (current != null && !current.equals(past)) {
+                needsUpdate = true;
+                updateStatement.with(set(columnName, current));
+
+                // Update index, if applicable
+                if (schema.getColumns().get(columnName).isAnnotationPresent(INDEX)) {
+                    batchStatement.add(
+                            QueryBuilder.update(format("%s_%s_idx", schema.getTableName(), columnName))
+                                    .with(set(format("%s_id", schema.getTableName()), schema.getIDValue(object)))
+                                    .where(eq(columnName, schema.getColumnValue(columnName, object)))
+                    );
                 }
             }
         }
-//        else {
-//            // XXX: Should we be doing this?
-//            for (Entry<String, Field> entry : schema.getColumns().entrySet()) {
-//                String columnName = entry.getKey();
-//                Field f = entry.getValue();
-//                
-//                needsUpdate = true;
-//                updateStatement.with(set(columnName, schema.getColumnValue(columnName, object)));
-//                
-//                // Add index
-//                if (f.isAnnotationPresent(Schema.INDEX)) {
-//                    String tableName = format("%s_%s_idx", schema.getTableName(), columnName);
-//                    batchStatement.add(
-//                            insertInto(tableName)
-//                                .value(columnName, Util.getFieldValue(f, object))
-//                                .value(format("%s_id", schema.getTableName()), schema.getIDValue(object))
-//                    );
-//                }
-//            }
-//        }
 
         updateStatement.where(eq(schema.getIDName(), schema.getIDValue(object)));
 
@@ -456,7 +438,7 @@ public class CassandraStorage implements Storage {
         Row row = results.one();
 
         checkState(results.isExhausted(), "query returned more than one row");
-        if (row == null) Optional.absent();
+        if (row == null) return new Session<T>(null);
         
         return read(cls, row.getUUID(format("%s_id", schema.getTableName())), consistency);
     }
