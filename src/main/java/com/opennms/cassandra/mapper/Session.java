@@ -11,6 +11,14 @@ import java.util.UUID;
  * @param <T>
  *            persisted type
  */
+// FIXME sw: don't need this, m_objectCache caches only instances which already have a uuid, and the cache could be something like this
+    /*
+      cache {
+        Class entityClass
+        Schema entitySchema
+        Map<UUID,entity> objectCache
+      }
+     */
 public class Session<T> {
 
     public static final ConsistencyLevel DEFAULT_CONSISTENCY_LEVEL = ConsistencyLevel.ONE;
@@ -18,6 +26,7 @@ public class Session<T> {
     private final UUID m_id = UUID.randomUUID();
     private final T m_obj;
 
+    // FIXME sw: do we need it here? doesn't seem to be related to the livecycle of an entity and EntityStore has method arguments for non default behaviour
     private ConsistencyLevel m_consistency = ConsistencyLevel.ONE;
 
     public Session(T obj) {

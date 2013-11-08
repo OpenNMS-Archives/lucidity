@@ -204,6 +204,7 @@ class Schema {
                 
                 try {
                     f.setAccessible(true);
+                    // FIXME sw: check for empty name
                     columns.put(c.name(), f);
                 }
                 catch (IllegalArgumentException e) {
@@ -223,6 +224,9 @@ class Schema {
                 oneToManys.put(f, fromClass((Class<?>)type));
 
             }
+
+            // FIXME sw: should log warning about unsupported annotations
+            // FIXME sw: should log warning about fields without annotations (@Transient ... I don't like it)
         }
 
         if (idField == null) {

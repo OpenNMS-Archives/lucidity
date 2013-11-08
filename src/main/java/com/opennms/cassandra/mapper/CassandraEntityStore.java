@@ -52,9 +52,12 @@ import com.google.common.collect.Sets.SetView;
 // FIXME: delete() should remove from instance cache as well.
 // FIXME: replace instances of Class.newInstance() with method from Util
 
+
 public class CassandraEntityStore implements EntityStore {
 
+    // FIXME sw: in the best case scenaria cache and session are part of a LuciditySession.
     private final com.datastax.driver.core.Session m_session;
+    // FIXME sw: do DAO/Repos have to be Singletons with a state, or do you plan to inject EntityStore in a kind of PersistenceContext/Session/Entitymanager way?
     private ConcurrentMap<UUID, Record> m_objectCache = new ConcurrentHashMap<>();
 
     public CassandraEntityStore(String host, int port, String keyspace) {
@@ -111,6 +114,7 @@ public class CassandraEntityStore implements EntityStore {
             insertStatement.value(columnName, schema.getColumnValue(columnName, object));
             
             if (entry.getValue().isAnnotationPresent(Schema.INDEX)) {
+                // FIXME sw: make all the %s*_suffix static String, at least the suffixes, also see Schema
                 String tableName = format("%s_%s_idx", schema.getTableName(), columnName);
                 batch.add(
                         insertInto(tableName)
@@ -248,6 +252,7 @@ public class CassandraEntityStore implements EntityStore {
         batchStatement.setConsistencyLevel(getSessionConsistencyLevel(session));
         m_session.execute(batchStatement);
 
+        // FIXME sw: objectCache should be updated?
     }
 
     @Override
@@ -285,6 +290,7 @@ public class CassandraEntityStore implements EntityStore {
             
             Schema s = entry.getValue();
             Collection<Object> relations = Lists.newArrayList();
+            // FIXME sw: suggestion, add a suffix
             String joinTable = format("%s_%s", schema.getTableName(), s.getTableName());
             Statement statement = select().from(joinTable).where(eq(joinColumnName(schema.getTableName()), id));
             statement.setConsistencyLevel(getDriverConsistencyLevel(consistency));
@@ -294,6 +300,7 @@ public class CassandraEntityStore implements EntityStore {
 
                 Session<?> joined = read(s.getObjectType(), u);
 
+                // FIXME sw: should be fine, log (debug,trace) would be nice
                 // XXX: This will silently ignore negative hits, is that what we want?
                 if (joined.get() != null) {
                     relations.add(read(s.getObjectType(), u).get());
