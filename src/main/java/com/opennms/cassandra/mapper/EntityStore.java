@@ -3,7 +3,7 @@ package com.opennms.cassandra.mapper;
 
 import java.util.UUID;
 
-
+// FIXME sw: what about https://github.com/otaviojava/Easy-Cassandra
 public interface EntityStore {
 
     /**
