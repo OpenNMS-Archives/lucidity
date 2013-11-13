@@ -8,6 +8,7 @@ import javax.inject.Singleton;
 
 import com.datastax.driver.core.Cluster;
 import com.datastax.driver.core.Session;
+import com.datastax.driver.core.exceptions.DriverException;
 
 
 @Singleton
@@ -27,7 +28,13 @@ public class CassandraEntityStoreFactory implements EntityStoreFactory {
         m_consistency = consistency;
 
         Cluster cluster = Cluster.builder().withPort(port).addContactPoint(host).build();
-        m_session = cluster.connect(keyspace);
+
+        try {
+            m_session = cluster.connect(keyspace);
+        }
+        catch (DriverException e) {
+            throw new LucidityException(e);
+        }
 
     }
 

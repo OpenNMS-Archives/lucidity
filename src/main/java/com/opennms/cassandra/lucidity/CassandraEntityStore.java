@@ -35,6 +35,7 @@ import com.datastax.driver.core.ResultSet;
 import com.datastax.driver.core.Row;
 import com.datastax.driver.core.Session;
 import com.datastax.driver.core.Statement;
+import com.datastax.driver.core.exceptions.DriverException;
 import com.datastax.driver.core.querybuilder.Batch;
 import com.datastax.driver.core.querybuilder.Insert;
 import com.datastax.driver.core.querybuilder.QueryBuilder;
@@ -53,9 +54,9 @@ import com.google.common.collect.Sets.SetView;
 
 // ~~~~~~~~~~~~
 
-//FIXME: create() should return an "attached" copy?  a difference instance?
-//FIXME: Wrap java driver exceptions in something (don't expose to consumers of this API).
-//FIXME: Reflection errors shouldn't be propagated as RuntimeExceptions (use custom exception).
+// FIXME: create() should return an "attached" copy?  a difference instance?
+// FIXME: replace javax.persistence annotations with our own.
+// FIXME: Update instance cache from update() method
 
 public class CassandraEntityStore implements EntityStore {
 
@@ -153,8 +154,7 @@ public class CassandraEntityStore implements EntityStore {
 
         }
 
-        batch.setConsistencyLevel(getDriverConsistencyLevel(consistency));
-        m_session.execute(batch);
+        executeStatement(batch, consistency);
 
         Util.setFieldValue(schema.getIDField(), object, id);
         cacheInstance(object);
@@ -251,8 +251,7 @@ public class CassandraEntityStore implements EntityStore {
             }
         }
 
-        batchStatement.setConsistencyLevel(getDriverConsistencyLevel(consistency));
-        m_session.execute(batchStatement);
+        executeStatement(batchStatement, consistency);
 
         // FIXME sw: objectCache should be updated?
     }
@@ -270,7 +269,7 @@ public class CassandraEntityStore implements EntityStore {
         Schema schema = getSchema(instance);
         Statement selectStatement = select().from(schema.getTableName()).where(eq(schema.getIDName(), id));
         selectStatement.setConsistencyLevel(getDriverConsistencyLevel(consistency));
-        ResultSet results = m_session.execute(selectStatement);
+        ResultSet results = executeStatement(selectStatement, consistency);
         Row row = results.one();
 
         checkState(results.isExhausted(), "query returned more than one row");
@@ -291,7 +290,7 @@ public class CassandraEntityStore implements EntityStore {
             Statement statement = select().from(joinTable).where(eq(joinColumnName(schema.getTableName()), id));
             statement.setConsistencyLevel(getDriverConsistencyLevel(consistency));
 
-            for (Row r : m_session.execute(statement)) {
+            for (Row r : executeStatement(statement, consistency)) {
                 UUID u = r.getUUID(joinColumnName(s.getTableName()));
 
                 Optional<?> joined = read(s.getObjectType(), u);
@@ -325,7 +324,7 @@ public class CassandraEntityStore implements EntityStore {
         Schema schema = getSchema(instance);
         Statement selectStatement = select(format("%s_id", schema.getTableName())).from(format("%s_%s_idx", schema.getTableName(), indexedName)).where(eq(indexedName, value));
         selectStatement.setConsistencyLevel(getDriverConsistencyLevel(consistency));
-        ResultSet results = m_session.execute(selectStatement);
+        ResultSet results = executeStatement(selectStatement, consistency);
         Row row = results.one();
 
         checkState(results.isExhausted(), "query returned more than one row");
@@ -439,8 +438,7 @@ public class CassandraEntityStore implements EntityStore {
                     .where(eq(joinColumnName(schema.getTableName()), schema.getIDValue(obj))));
         }
 
-        batchStatement.setConsistencyLevel(getDriverConsistencyLevel(consistency));
-        m_session.execute(batchStatement);
+        executeStatement(batchStatement, consistency);
 
         m_instanceCache.remove(getInstanceID(obj));
 
@@ -450,6 +448,16 @@ public class CassandraEntityStore implements EntityStore {
     public void close() throws IOException {
         // TODO Auto-generated method stub
 
+    }
+
+    private ResultSet executeStatement(Statement statement, ConsistencyLevel cl) {
+        try {
+            statement.setConsistencyLevel(getDriverConsistencyLevel(cl));
+            return m_session.execute(statement);
+        }
+        catch (DriverException driverExcp) {
+            throw new LucidityException(driverExcp);
+        }
     }
 
 }
