@@ -4,7 +4,6 @@ package com.opennms.cassandra.mapper;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
 import java.util.Date;
@@ -13,6 +12,7 @@ import java.util.Set;
 import org.junit.Before;
 import org.junit.Test;
 
+import com.google.common.base.Optional;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
 
@@ -43,7 +43,7 @@ public class CassandraStorageTestITCase {
 
         m_sampleAddresses = addresses;
         m_sampleUser = u;
-        m_entityStore = new CassandraEntityStore("localhost", 9042, "mapper_test");
+        m_entityStore = new CassandraEntityStore("localhost", 9042, "mapper_test", ConsistencyLevel.ONE);
 
     }
 
@@ -82,11 +82,11 @@ public class CassandraStorageTestITCase {
     public void testUpdate() {
 
         User user = new User("Eric", "Evans", "eevans@opennms.com");
-        Session<User> session = m_entityStore.create(user);
+        User created = m_entityStore.create(user);
 
         user.setEmail("eevans@opennms.org");
 
-        m_entityStore.update(session);
+        m_entityStore.update(created);
 
         User read = get(m_entityStore.read(User.class, user.getId()));
 
@@ -98,9 +98,9 @@ public class CassandraStorageTestITCase {
     public void testUpdateNoDiff() {
 
         User user = new User("Eric", "Evans", "eevans@opennms.com");
-        Session<User> session = m_entityStore.create(user);
+        User created = m_entityStore.create(user);
 
-        m_entityStore.update(session);
+        m_entityStore.update(created);
 
         User read = get(m_entityStore.read(User.class, user.getId()));
 
@@ -116,14 +116,12 @@ public class CassandraStorageTestITCase {
         // Write, read, verify presence.
         User user = new User("Eric", "Evans", "eevans@opennms.com");
         m_entityStore.create(user);
-        Session<User> read = m_entityStore.read(User.class, user.getId());
-
-        assertNotNull(read.get());
+        User read = get(m_entityStore.read(User.class, user.getId()));
 
         // Delete, verify absence.
         m_entityStore.delete(read);
 
-        assertNull(m_entityStore.read(User.class, user.getId()).get());
+        assertFalse(m_entityStore.read(User.class, user.getId()).isPresent());
 
     }
 
@@ -143,24 +141,23 @@ public class CassandraStorageTestITCase {
     @Test
     public void testUpdateWithOneToMany() {
 
-        Session<User> session = persistSampleUser();
+        User user = persistSampleUser();
 
         // Persist an additional address, re-read, and ensure present.
         Address added = new Address("Sunset Blvd", "Los Angeles", "90069");
         m_entityStore.create(added);
 
         m_sampleUser.getAddresses().add(added);
-        m_entityStore.update(session);
+        m_entityStore.update(user);
 
-        Session<User> readSession = m_entityStore.read(User.class, m_sampleUser.getId());
-        User read = readSession.get();
+        User read = get(m_entityStore.read(User.class, m_sampleUser.getId()));
 
         assertTrue(read.getAddresses().contains(added));
 
         // Remove one address, re-read, and ensure absent.
         Address removed = m_sampleAddresses[0];
         read.getAddresses().remove(removed);
-        m_entityStore.update(readSession);
+        m_entityStore.update(read);
 
         read = get(m_entityStore.read(User.class, m_sampleUser.getId()));
 
@@ -171,12 +168,12 @@ public class CassandraStorageTestITCase {
     @Test(expected = IllegalStateException.class)
     public void testUpdateWithUnpersistedRelations() {
 
-        Session<User> session = persistSampleUser();
+        User user = persistSampleUser();
 
         // Update with an unpersisted address (should except).
         m_sampleUser.getAddresses().add(new Address("Sunset Blvd", "Los Angeles", "90069"));
 
-        m_entityStore.update(session);
+        m_entityStore.update(user);
 
     }
 
@@ -195,10 +192,10 @@ public class CassandraStorageTestITCase {
     @Test
     public void testUpdateIndexedColumn() {
 
-        Session<User> session = persistSampleUser();
+        User user = persistSampleUser();
 
         m_sampleUser.setEmail("root@matrix.com");
-        m_entityStore.update(session);
+        m_entityStore.update(user);
 
         User read = get(m_entityStore.read(User.class, "email", m_sampleUser.getEmail()));
 
@@ -207,12 +204,12 @@ public class CassandraStorageTestITCase {
 
     }
 
-    private Session<User> persistSampleUser() {
+    private User persistSampleUser() {
         for (Address a : m_sampleAddresses) m_entityStore.create(a);
         return m_entityStore.create(m_sampleUser);
     }
 
-    private <T> T get(Session<T> ref) {
+    private <T> T get(Optional<T> ref) {
         assertNotNull(ref.get());
         return ref.get();
     }

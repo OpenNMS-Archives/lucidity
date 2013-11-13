@@ -16,6 +16,7 @@ import static com.opennms.cassandra.mapper.Schema.INDEX;
 import static com.opennms.cassandra.mapper.Schema.joinColumnName;
 import static java.lang.String.format;
 
+import java.io.IOException;
 import java.lang.reflect.Field;
 import java.math.BigDecimal;
 import java.math.BigInteger;
@@ -28,7 +29,6 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
 import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 
 import com.datastax.driver.core.Cluster;
@@ -39,7 +39,9 @@ import com.datastax.driver.core.querybuilder.Batch;
 import com.datastax.driver.core.querybuilder.Insert;
 import com.datastax.driver.core.querybuilder.QueryBuilder;
 import com.datastax.driver.core.querybuilder.Update;
+import com.google.common.base.Optional;
 import com.google.common.collect.Lists;
+import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 import com.google.common.collect.Sets.SetView;
 
@@ -51,20 +53,26 @@ import com.google.common.collect.Sets.SetView;
 // FIXME: Support collection types.
 // FIXME: delete() should remove from instance cache as well.
 // FIXME: replace instances of Class.newInstance() with method from Util
-
+// FIXME: ctor should accept driver Session (one shared with all EntityStores)
+// FIXME: Need an EntityStoreFactory
+// FIXME: create() should return an "attached" copy?  a difference instance?
 
 public class CassandraEntityStore implements EntityStore {
 
     // FIXME sw: in the best case scenaria cache and session are part of a LuciditySession.
     private final com.datastax.driver.core.Session m_session;
+    private final ConsistencyLevel m_consistency;
     // FIXME sw: do DAO/Repos have to be Singletons with a state, or do you plan to inject EntityStore in a kind of PersistenceContext/Session/Entitymanager way?
-    private ConcurrentMap<UUID, Record> m_objectCache = new ConcurrentHashMap<>();
+    private ConcurrentMap<Integer, Record> m_instanceCache = Maps.newConcurrentMap();
 
-    public CassandraEntityStore(String host, int port, String keyspace) {
+    public CassandraEntityStore(String host, int port, String keyspace, ConsistencyLevel consistency) {
 
         checkNotNull(host, "Cassandra hostname");
         checkNotNull(port, "Cassandra port number");
         checkNotNull(keyspace, "Cassandra keyspace");
+        checkNotNull(consistency, "Cassandra consistency level");
+
+        m_consistency = consistency;
 
         Cluster cluster = Cluster.builder().withPort(port).addContactPoint(host).build();
         m_session = cluster.connect(keyspace);
@@ -75,23 +83,24 @@ public class CassandraEntityStore implements EntityStore {
         return Schema.fromClass(object.getClass());
     }
 
-    private com.datastax.driver.core.ConsistencyLevel getSessionConsistencyLevel(Session<?> session) {
-        return getDriverConsistencyLevel(session.getConsistencyLevel());
-    }
-    
     private com.datastax.driver.core.ConsistencyLevel getDriverConsistencyLevel(ConsistencyLevel cl) {
         return com.datastax.driver.core.ConsistencyLevel.fromCode(cl.getDriverCode());
     }
 
-    @Override
-    public <T> Session<T> create(T object) {
-        return create(object, Session.DEFAULT_CONSISTENCY_LEVEL);
+    private Integer getInstanceID(Object o) {
+        return System.identityHashCode(o);
     }
-    
+
     @Override
-    public <T> Session<T> create(T object, ConsistencyLevel consistency) {
+    public <T> T create(T object) {
+        return create(object, m_consistency);
+    }
+
+    @Override
+    public <T> T create(T object, ConsistencyLevel consistency) {
 
         checkNotNull(object, "object argument");
+        checkNotNull(consistency, "consistency argument");
         checkArgument(
                 object.getClass().isAnnotationPresent(ENTITY),
                 String.format("%s not annotated with @%s", getClass().getSimpleName(), ENTITY.getCanonicalName()));
@@ -123,9 +132,9 @@ public class CassandraEntityStore implements EntityStore {
                 );
             }
         }
-        
+
         batch.add(insertStatement);
-        
+
         // One-to-Many relationship persistence
         for (Map.Entry<Field, Schema> entry : schema.getOneToManys().entrySet()) {
             Schema s = entry.getValue();
@@ -159,20 +168,24 @@ public class CassandraEntityStore implements EntityStore {
         m_session.execute(batch);
 
         Util.setFieldValue(schema.getIDField(), object, id);
+        cacheInstance(object);
         
-        return cacheSession(new Session<T>(object).setConsistencyLevel(consistency));
+        return object;
     }
 
     @Override
-    public <T> void update(Session<T> session) {
+    public <T> void update(T object) {
+        update(object, m_consistency);
+    }
 
-        Record record = m_objectCache.get(session.getID());
+    @Override
+    public <T> void update(T object, ConsistencyLevel consistency) {
+
+        Record record = m_instanceCache.get(getInstanceID(object));
 
         if (record == null) {
             throw new IllegalStateException("session is invalid");
         }
-
-        Object object = session.get();
 
         Schema schema = getSchema(object);
         boolean needsUpdate = false;
@@ -249,19 +262,19 @@ public class CassandraEntityStore implements EntityStore {
             }
         }
 
-        batchStatement.setConsistencyLevel(getSessionConsistencyLevel(session));
+        batchStatement.setConsistencyLevel(getDriverConsistencyLevel(consistency));
         m_session.execute(batchStatement);
 
         // FIXME sw: objectCache should be updated?
     }
 
     @Override
-    public <T> Session<T> read(Class<T> cls, UUID id) {
-        return read(cls, id, Session.DEFAULT_CONSISTENCY_LEVEL);
+    public <T> Optional<T> read(Class<T> cls, UUID id) {
+        return read(cls, id, m_consistency);
     }
-    
+
     @Override
-    public <T> Session<T> read(Class<T> cls, UUID id, ConsistencyLevel consistency) {
+    public <T> Optional<T> read(Class<T> cls, UUID id, ConsistencyLevel consistency) {
 
         T instance;
         try {
@@ -278,7 +291,7 @@ public class CassandraEntityStore implements EntityStore {
         Row row = results.one();
 
         checkState(results.isExhausted(), "query returned more than one row");
-        if (row == null) return new Session<T>(null);
+        if (row == null) return Optional.absent();
 
         Util.setFieldValue(schema.getIDField(), instance, row.getUUID(schema.getIDName()));
 
@@ -298,11 +311,11 @@ public class CassandraEntityStore implements EntityStore {
             for (Row r : m_session.execute(statement)) {
                 UUID u = r.getUUID(joinColumnName(s.getTableName()));
 
-                Session<?> joined = read(s.getObjectType(), u);
+                Optional<?> joined = read(s.getObjectType(), u);
 
                 // FIXME sw: should be fine, log (debug,trace) would be nice
                 // XXX: This will silently ignore negative hits, is that what we want?
-                if (joined.get() != null) {
+                if (joined.isPresent()) {
                     relations.add(read(s.getObjectType(), u).get());
                 }
             }
@@ -310,25 +323,27 @@ public class CassandraEntityStore implements EntityStore {
             Util.setFieldValue(entry.getKey(), instance, relations);
 
         }
+        
+        cacheInstance(instance);
 
-        return cacheSession(new Session<T>(instance).setConsistencyLevel(consistency));
+        return Optional.of(instance);
     }
 
-    private <T> Session<T> cacheSession(Session<T> sess) {
-        T object = sess.get();
-        Schema schema = getSchema(sess.get());
+    private <T> void cacheInstance(T inst) {
+        Schema schema = getSchema(inst);
+        Record record = new Record(schema.getIDValue(inst));
 
-        Record record = new Record(schema.getIDValue(object));
         for (String columnName : schema.getColumns().keySet()) {
-            record.putColumn(columnName, schema.getColumnValue(columnName, object));
+            record.putColumn(columnName, schema.getColumnValue(columnName, inst));
         }
+
         for (Field f : schema.getOneToManys().keySet()) {
-            Collection<?> relations = (Collection<?>) Util.getFieldValue(f, object);
+            Collection<?> relations = (Collection<?>) Util.getFieldValue(f, inst);
             record.putOneToMany(f, (relations != null) ? Lists.newArrayList(relations) : null);
         }
-        m_objectCache.put(sess.getID(), record);
-        
-        return sess;
+
+        m_instanceCache.put(getInstanceID(inst), record);
+
     }
 
     private void setColumn(Object obj, String name, Field f, Row data) {
@@ -390,10 +405,13 @@ public class CassandraEntityStore implements EntityStore {
     }
 
     @Override
-    public <T> void delete(Session<T> session) {
+    public <T> void delete(T obj) {
+        delete(obj, m_consistency);
+    }
 
-        T obj = session.get();
-        
+    @Override
+    public <T> void delete(T obj, ConsistencyLevel consistency) {
+
         Schema schema = getSchema(obj);
         Batch batchStatement = batch(QueryBuilder.delete().from(schema.getTableName())
                 .where(eq(schema.getIDName(), schema.getIDValue(obj))));
@@ -416,18 +434,18 @@ public class CassandraEntityStore implements EntityStore {
                     .where(eq(joinColumnName(schema.getTableName()), schema.getIDValue(obj))));
         }
 
-        batchStatement.setConsistencyLevel(getSessionConsistencyLevel(session));
+        batchStatement.setConsistencyLevel(getDriverConsistencyLevel(consistency));
         m_session.execute(batchStatement);
 
     }
 
     @Override
-    public <T> Session<T> read(Class<T> cls, String indexedName, Object value) {
-        return read(cls, indexedName, value, Session.DEFAULT_CONSISTENCY_LEVEL);
+    public <T> Optional<T> read(Class<T> cls, String indexedName, Object value) {
+        return read(cls, indexedName, value, m_consistency);
     }
     
     @Override
-    public <T> Session<T> read(Class<T> cls, String indexedName, Object value, ConsistencyLevel consistency) {
+    public <T> Optional<T> read(Class<T> cls, String indexedName, Object value, ConsistencyLevel consistency) {
 
         T instance;
         try {
@@ -444,9 +462,15 @@ public class CassandraEntityStore implements EntityStore {
         Row row = results.one();
 
         checkState(results.isExhausted(), "query returned more than one row");
-        if (row == null) return new Session<T>(null);
-        
+        if (row == null) Optional.absent();
+
         return read(cls, row.getUUID(format("%s_id", schema.getTableName())), consistency);
+    }
+
+    @Override
+    public void close() throws IOException {
+        // TODO Auto-generated method stub
+
     }
 
 }

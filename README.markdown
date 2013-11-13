@@ -32,13 +32,15 @@ Objects persisted with Lucidity must:
 
   * Have a nullary (no-arg) constructor.
   * Be annotated with `@Entity`.
-  * Have exactly one field annotated with `@Id`, the type must be
+  * Have exactly one property annotated with `@Id`, the type must be
     `java.util.UUID`.
-  * Have at least one `@Column` annotated field.
+  * Have at least one `@Column` annotated property.
 
 The `@Table` annotation is optional, if ommited the name of the class is
 used as the table name.  The `name` argument to `@Column` is also optional,
 and will default to the name of the property if unused.
+
+_Note: Currently only field annoations are supported._
 
 
     EntityStore storage = new CassandraEntityStore("localhost", 9042, "keyspace");
