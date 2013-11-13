@@ -66,7 +66,7 @@ public class CassandraStorageTestITCase {
     }
 
     @Test(expected = IllegalStateException.class)
-    public void testCreateWithUnpersistedRelations() throws StorageException {
+    public void testCreateWithUnpersistedRelations() {
         // Save user without saving the address relations.
         m_entityStore.create(m_sampleUser);
         m_entityStore.read(User.class, m_sampleUser.getId());
