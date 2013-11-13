@@ -327,7 +327,7 @@ public class CassandraEntityStore implements EntityStore {
         Row row = results.one();
 
         checkState(results.isExhausted(), "query returned more than one row");
-        if (row == null) Optional.absent();
+        if (row == null) return Optional.absent();
 
         return read(cls, row.getUUID(format("%s_id", schema.getTableName())), consistency);
     }
