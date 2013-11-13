@@ -43,21 +43,15 @@ public class CassandraStorageTestITCase {
 
         m_sampleAddresses = addresses;
         m_sampleUser = u;
-        m_entityStore = new CassandraEntityStore("localhost", 9042, "mapper_test", ConsistencyLevel.ONE);
+        m_entityStore = new CassandraEntityStoreFactory("localhost", 9042, "mapper_test", ConsistencyLevel.ONE).createEntityStore();
 
     }
 
     @Test
     public void testCreate() {
 
-        // Persist associated addresses
-        for (Address a : m_sampleAddresses) {
-            m_entityStore.create(a);
-        }
-
-        m_entityStore.create(m_sampleUser);
-        
         // Persist user and then read it back by ID.
+        persistSampleUser();
         User user = get(m_entityStore.read(User.class, m_sampleUser.getId()));
 
         assertEquals(m_sampleUser.getGiven(), user.getGiven());

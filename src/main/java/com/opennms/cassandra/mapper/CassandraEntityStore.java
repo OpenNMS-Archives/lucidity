@@ -31,9 +31,9 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentMap;
 
-import com.datastax.driver.core.Cluster;
 import com.datastax.driver.core.ResultSet;
 import com.datastax.driver.core.Row;
+import com.datastax.driver.core.Session;
 import com.datastax.driver.core.Statement;
 import com.datastax.driver.core.querybuilder.Batch;
 import com.datastax.driver.core.querybuilder.Insert;
@@ -53,30 +53,20 @@ import com.google.common.collect.Sets.SetView;
 // FIXME: Support collection types.
 // FIXME: delete() should remove from instance cache as well.
 // FIXME: replace instances of Class.newInstance() with method from Util
-// FIXME: ctor should accept driver Session (one shared with all EntityStores)
-// FIXME: Need an EntityStoreFactory
 // FIXME: create() should return an "attached" copy?  a difference instance?
+// FIXME: Implement anything for close()?
 
 public class CassandraEntityStore implements EntityStore {
 
     // FIXME sw: in the best case scenaria cache and session are part of a LuciditySession.
-    private final com.datastax.driver.core.Session m_session;
+    private final Session m_session;
     private final ConsistencyLevel m_consistency;
     // FIXME sw: do DAO/Repos have to be Singletons with a state, or do you plan to inject EntityStore in a kind of PersistenceContext/Session/Entitymanager way?
     private ConcurrentMap<Integer, Record> m_instanceCache = Maps.newConcurrentMap();
 
-    public CassandraEntityStore(String host, int port, String keyspace, ConsistencyLevel consistency) {
-
-        checkNotNull(host, "Cassandra hostname");
-        checkNotNull(port, "Cassandra port number");
-        checkNotNull(keyspace, "Cassandra keyspace");
-        checkNotNull(consistency, "Cassandra consistency level");
-
+    public CassandraEntityStore(Session session, ConsistencyLevel consistency) {
+        m_session = session;
         m_consistency = consistency;
-
-        Cluster cluster = Cluster.builder().withPort(port).addContactPoint(host).build();
-        m_session = cluster.connect(keyspace);
-
     }
 
     private Schema getSchema(Object object) {
