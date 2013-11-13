@@ -1,14 +1,13 @@
 package com.opennms.cassandra.mapper;
 
 
+import static com.google.common.base.Throwables.propagate;
+
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
-import java.util.Arrays;
 
 import com.google.common.base.Optional;
-import com.google.common.base.Predicate;
 import com.google.common.base.Throwables;
-import com.google.common.collect.Iterables;
 
 
 class Util {
@@ -49,14 +48,32 @@ class Util {
      *            the Class
      * @return Optional no-argument constructor
      */
-    static Optional<Constructor<?>> getNoArgConstructor(Class<?> cls) {
-        return Iterables.tryFind(Arrays.asList(cls.getDeclaredConstructors()), new Predicate<Constructor<?>>() {
+    static <T> Optional<Constructor<T>> getNoArgConstructor(Class<T> cls) {
+        Constructor<T> ctor;
+        try {
+            ctor = cls.getDeclaredConstructor();
+        }
+        catch (NoSuchMethodException | SecurityException e) {
+            return Optional.absent();
+        }
+        return Optional.of(ctor);
+    }
 
-            @Override
-            public boolean apply(Constructor<?> input) {
-                return input.getParameterTypes().length == 0;
-            }
-        });
+    /**
+     * Convenience method; Returns a new instance of a class from a nullary constructor. Exceptions
+     * are propagated as {@link RuntimeException}s.
+     *
+     * @param cls
+     *            class to create new instance from
+     * @return instance
+     */
+    static <T> T newInstance(Class<T> cls) {
+        try {
+            return cls.getDeclaredConstructor().newInstance();
+        }
+        catch (Exception e) {
+            throw propagate(e);
+        }
     }
 
 }

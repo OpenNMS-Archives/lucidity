@@ -53,7 +53,6 @@ import com.google.common.collect.Sets.SetView;
 
 // ~~~~~~~~~~~~
 
-//FIXME: replace instances of Class.newInstance() with method from Util
 //FIXME: create() should return an "attached" copy?  a difference instance?
 //FIXME: Wrap java driver exceptions in something (don't expose to consumers of this API).
 //FIXME: Reflection errors shouldn't be propagated as RuntimeExceptions (use custom exception).
@@ -266,13 +265,7 @@ public class CassandraEntityStore implements EntityStore {
     @Override
     public <T> Optional<T> read(Class<T> cls, UUID id, ConsistencyLevel consistency) {
 
-        T instance;
-        try {
-            instance = cls.newInstance();
-        }
-        catch (InstantiationException | IllegalAccessException e) {
-            throw propagate(e);    // Missing ctor?
-        }
+        T instance = Util.newInstance(cls);
 
         Schema schema = getSchema(instance);
         Statement selectStatement = select().from(schema.getTableName()).where(eq(schema.getIDName(), id));
@@ -313,7 +306,7 @@ public class CassandraEntityStore implements EntityStore {
             Util.setFieldValue(entry.getKey(), instance, relations);
 
         }
-        
+
         cacheInstance(instance);
 
         return Optional.of(instance);
@@ -327,13 +320,7 @@ public class CassandraEntityStore implements EntityStore {
     @Override
     public <T> Optional<T> read(Class<T> cls, String indexedName, Object value, ConsistencyLevel consistency) {
 
-        T instance;
-        try {
-            instance = cls.newInstance();
-        }
-        catch (InstantiationException | IllegalAccessException e) {
-            throw propagate(e);    // Missing ctor?
-        }
+        T instance = Util.newInstance(cls);
 
         Schema schema = getSchema(instance);
         Statement selectStatement = select(format("%s_id", schema.getTableName())).from(format("%s_%s_idx", schema.getTableName(), indexedName)).where(eq(indexedName, value));
