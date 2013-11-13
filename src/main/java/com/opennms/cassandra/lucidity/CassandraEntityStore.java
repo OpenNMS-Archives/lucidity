@@ -1,4 +1,4 @@
-package com.opennms.cassandra.mapper;
+package com.opennms.cassandra.lucidity;
 
 
 import static com.datastax.driver.core.querybuilder.QueryBuilder.batch;
@@ -10,10 +10,10 @@ import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.base.Throwables.propagate;
-import static com.opennms.cassandra.mapper.Schema.ENTITY;
-import static com.opennms.cassandra.mapper.Schema.ID;
-import static com.opennms.cassandra.mapper.Schema.INDEX;
-import static com.opennms.cassandra.mapper.Schema.joinColumnName;
+import static com.opennms.cassandra.lucidity.Schema.ENTITY;
+import static com.opennms.cassandra.lucidity.Schema.ID;
+import static com.opennms.cassandra.lucidity.Schema.INDEX;
+import static com.opennms.cassandra.lucidity.Schema.joinColumnName;
 import static java.lang.String.format;
 
 import java.io.IOException;

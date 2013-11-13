@@ -1,4 +1,4 @@
-package com.opennms.cassandra.mapper;
+package com.opennms.cassandra.lucidity;
 
 public interface EntityStoreFactory {
     EntityStore createEntityStore();

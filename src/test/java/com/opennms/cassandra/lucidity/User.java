@@ -1,7 +1,7 @@
-package com.opennms.cassandra.mapper;
+package com.opennms.cassandra.lucidity;
 
 
-import static com.opennms.cassandra.mapper.IndexType.INVERTED;
+import static com.opennms.cassandra.lucidity.IndexType.INVERTED;
 
 import java.util.Collection;
 import java.util.Date;
@@ -12,6 +12,8 @@ import javax.persistence.Entity;
 import javax.persistence.Id;
 import javax.persistence.OneToMany;
 import javax.persistence.Table;
+
+import com.opennms.cassandra.lucidity.Index;
 
 
 @Entity

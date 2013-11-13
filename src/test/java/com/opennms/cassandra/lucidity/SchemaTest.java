@@ -1,10 +1,12 @@
-package com.opennms.cassandra.mapper;
+package com.opennms.cassandra.lucidity;
 
 
 import javax.persistence.Entity;
 import javax.persistence.Id;
 
 import org.junit.Test;
+
+import com.opennms.cassandra.lucidity.Schema;
 
 
 public class SchemaTest {

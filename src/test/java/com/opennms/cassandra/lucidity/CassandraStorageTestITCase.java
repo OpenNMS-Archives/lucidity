@@ -1,4 +1,4 @@
-package com.opennms.cassandra.mapper;
+package com.opennms.cassandra.lucidity;
 
 
 import static org.junit.Assert.assertEquals;
@@ -15,6 +15,9 @@ import org.junit.Test;
 import com.google.common.base.Optional;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
+import com.opennms.cassandra.lucidity.CassandraEntityStoreFactory;
+import com.opennms.cassandra.lucidity.ConsistencyLevel;
+import com.opennms.cassandra.lucidity.EntityStore;
 
 
 // FIXME: Ensure tests cover properties of all supported types.
