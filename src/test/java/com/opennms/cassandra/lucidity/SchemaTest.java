@@ -1,8 +1,8 @@
 package com.opennms.cassandra.lucidity;
 
 
-import javax.persistence.Entity;
-import javax.persistence.Id;
+import com.opennms.cassandra.lucidity.annotations.Entity;
+import com.opennms.cassandra.lucidity.annotations.Id;
 
 import org.junit.Test;
 

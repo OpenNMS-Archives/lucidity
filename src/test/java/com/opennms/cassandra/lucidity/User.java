@@ -1,19 +1,19 @@
 package com.opennms.cassandra.lucidity;
 
 
-import static com.opennms.cassandra.lucidity.IndexType.INVERTED;
+import static com.opennms.cassandra.lucidity.annotations.IndexType.INVERTED;
 
 import java.util.Collection;
 import java.util.Date;
 import java.util.UUID;
 
-import javax.persistence.Column;
-import javax.persistence.Entity;
-import javax.persistence.Id;
-import javax.persistence.OneToMany;
-import javax.persistence.Table;
+import com.opennms.cassandra.lucidity.annotations.Column;
+import com.opennms.cassandra.lucidity.annotations.Entity;
+import com.opennms.cassandra.lucidity.annotations.Id;
+import com.opennms.cassandra.lucidity.annotations.OneToMany;
+import com.opennms.cassandra.lucidity.annotations.Table;
 
-import com.opennms.cassandra.lucidity.Index;
+import com.opennms.cassandra.lucidity.annotations.Index;
 
 
 @Entity

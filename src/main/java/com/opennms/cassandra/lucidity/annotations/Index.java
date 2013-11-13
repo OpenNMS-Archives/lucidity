@@ -1,4 +1,4 @@
-package com.opennms.cassandra.lucidity;
+package com.opennms.cassandra.lucidity.annotations;
 
 import static java.lang.annotation.ElementType.FIELD;
 import static java.lang.annotation.ElementType.METHOD;

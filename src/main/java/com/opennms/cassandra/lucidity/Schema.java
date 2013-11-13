@@ -16,14 +16,14 @@ import java.util.Date;
 import java.util.Map;
 import java.util.UUID;
 
-import javax.persistence.Column;
-import javax.persistence.Entity;
-import javax.persistence.Id;
-import javax.persistence.OneToMany;
-import javax.persistence.Table;
-
 import com.google.common.base.Throwables;
 import com.google.common.collect.Maps;
+import com.opennms.cassandra.lucidity.annotations.Column;
+import com.opennms.cassandra.lucidity.annotations.Entity;
+import com.opennms.cassandra.lucidity.annotations.Id;
+import com.opennms.cassandra.lucidity.annotations.Index;
+import com.opennms.cassandra.lucidity.annotations.OneToMany;
+import com.opennms.cassandra.lucidity.annotations.Table;
 
 // FIXME: support annotated methods, as well as fields.
 // FIXME: column names should default to property name when name is not set.

@@ -55,14 +55,13 @@ import com.google.common.collect.Sets.SetView;
 // ~~~~~~~~~~~~
 
 // FIXME: create() should return an "attached" copy?  a difference instance?
-// FIXME: replace javax.persistence annotations with our own.
 // FIXME: static methods in Schema to format table / column names
 
 public class CassandraEntityStore implements EntityStore {
 
     private final Session m_session;
     private final ConsistencyLevel m_consistency;
-    private ConcurrentMap<Integer, Record> m_instanceCache = Maps.newConcurrentMap();
+    private final ConcurrentMap<Integer, Record> m_instanceCache = Maps.newConcurrentMap();
 
     public CassandraEntityStore(Session session, ConsistencyLevel consistency) {
         m_session = session;
@@ -93,13 +92,13 @@ public class CassandraEntityStore implements EntityStore {
         checkNotNull(consistency, "consistency argument");
         checkArgument(
                 object.getClass().isAnnotationPresent(ENTITY),
-                String.format("%s not annotated with @%s", getClass().getSimpleName(), ENTITY.getCanonicalName()));
+                format("%s not annotated with @%s", getClass().getSimpleName(), ENTITY.getCanonicalName()));
 
         Schema schema = getSchema(object);
         
         checkArgument(
                 schema.getIDValue(object) == null,
-                String.format("property annotated with @%s must be null", ID.getCanonicalName()));
+                format("property annotated with @%s must be null", ID.getCanonicalName()));
 
         // Object persistence (incl. indices)
         UUID id = UUID.randomUUID();

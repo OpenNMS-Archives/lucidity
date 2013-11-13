@@ -3,10 +3,10 @@ package com.opennms.cassandra.lucidity;
 
 import java.util.UUID;
 
-import javax.persistence.Column;
-import javax.persistence.Entity;
-import javax.persistence.Id;
-import javax.persistence.Table;
+import com.opennms.cassandra.lucidity.annotations.Column;
+import com.opennms.cassandra.lucidity.annotations.Entity;
+import com.opennms.cassandra.lucidity.annotations.Id;
+import com.opennms.cassandra.lucidity.annotations.Table;
 
 import com.google.common.base.Objects;
 
