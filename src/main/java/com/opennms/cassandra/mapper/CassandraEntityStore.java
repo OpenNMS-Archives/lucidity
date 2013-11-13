@@ -47,21 +47,21 @@ import com.google.common.collect.Sets.SetView;
 
 
 // FIXME: Consider something from Guava for cache.
-// FIXME: Wrap java driver exceptions in something (don't expose to consumers of this API).
-// FIXME: Reflection errors shouldn't be propagated as RuntimeExceptions (use custom exception).
 // FIXME: Cache schemas?
 // FIXME: Support collection types.
-// FIXME: delete() should remove from instance cache as well.
-// FIXME: replace instances of Class.newInstance() with method from Util
-// FIXME: create() should return an "attached" copy?  a difference instance?
 // FIXME: Implement anything for close()?
+
+// ~~~~~~~~~~~~
+
+//FIXME: replace instances of Class.newInstance() with method from Util
+//FIXME: create() should return an "attached" copy?  a difference instance?
+//FIXME: Wrap java driver exceptions in something (don't expose to consumers of this API).
+//FIXME: Reflection errors shouldn't be propagated as RuntimeExceptions (use custom exception).
 
 public class CassandraEntityStore implements EntityStore {
 
-    // FIXME sw: in the best case scenaria cache and session are part of a LuciditySession.
     private final Session m_session;
     private final ConsistencyLevel m_consistency;
-    // FIXME sw: do DAO/Repos have to be Singletons with a state, or do you plan to inject EntityStore in a kind of PersistenceContext/Session/Entitymanager way?
     private ConcurrentMap<Integer, Record> m_instanceCache = Maps.newConcurrentMap();
 
     public CassandraEntityStore(Session session, ConsistencyLevel consistency) {
@@ -319,6 +319,34 @@ public class CassandraEntityStore implements EntityStore {
         return Optional.of(instance);
     }
 
+    @Override
+    public <T> Optional<T> read(Class<T> cls, String indexedName, Object value) {
+        return read(cls, indexedName, value, m_consistency);
+    }
+
+    @Override
+    public <T> Optional<T> read(Class<T> cls, String indexedName, Object value, ConsistencyLevel consistency) {
+
+        T instance;
+        try {
+            instance = cls.newInstance();
+        }
+        catch (InstantiationException | IllegalAccessException e) {
+            throw propagate(e);    // Missing ctor?
+        }
+
+        Schema schema = getSchema(instance);
+        Statement selectStatement = select(format("%s_id", schema.getTableName())).from(format("%s_%s_idx", schema.getTableName(), indexedName)).where(eq(indexedName, value));
+        selectStatement.setConsistencyLevel(getDriverConsistencyLevel(consistency));
+        ResultSet results = m_session.execute(selectStatement);
+        Row row = results.one();
+
+        checkState(results.isExhausted(), "query returned more than one row");
+        if (row == null) Optional.absent();
+
+        return read(cls, row.getUUID(format("%s_id", schema.getTableName())), consistency);
+    }
+
     private <T> void cacheInstance(T inst) {
         Schema schema = getSchema(inst);
         Record record = new Record(schema.getIDValue(inst));
@@ -427,34 +455,8 @@ public class CassandraEntityStore implements EntityStore {
         batchStatement.setConsistencyLevel(getDriverConsistencyLevel(consistency));
         m_session.execute(batchStatement);
 
-    }
+        m_instanceCache.remove(getInstanceID(obj));
 
-    @Override
-    public <T> Optional<T> read(Class<T> cls, String indexedName, Object value) {
-        return read(cls, indexedName, value, m_consistency);
-    }
-    
-    @Override
-    public <T> Optional<T> read(Class<T> cls, String indexedName, Object value, ConsistencyLevel consistency) {
-
-        T instance;
-        try {
-            instance = cls.newInstance();
-        }
-        catch (InstantiationException | IllegalAccessException e) {
-            throw propagate(e);    // Missing ctor?
-        }
-
-        Schema schema = getSchema(instance);
-        Statement selectStatement = select(format("%s_id", schema.getTableName())).from(format("%s_%s_idx", schema.getTableName(), indexedName)).where(eq(indexedName, value));
-        selectStatement.setConsistencyLevel(getDriverConsistencyLevel(consistency));
-        ResultSet results = m_session.execute(selectStatement);
-        Row row = results.one();
-
-        checkState(results.isExhausted(), "query returned more than one row");
-        if (row == null) Optional.absent();
-
-        return read(cls, row.getUUID(format("%s_id", schema.getTableName())), consistency);
     }
 
     @Override
