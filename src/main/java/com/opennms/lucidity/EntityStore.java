@@ -1,4 +1,4 @@
-package com.opennms.cassandra.lucidity;
+package com.opennms.lucidity;
 
 
 import java.io.Closeable;

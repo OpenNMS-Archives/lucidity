@@ -1,4 +1,4 @@
-package com.opennms.cassandra.lucidity;
+package com.opennms.lucidity;
 
 
 import static com.google.common.base.Preconditions.checkNotNull;
@@ -18,12 +18,12 @@ import java.util.UUID;
 
 import com.google.common.base.Throwables;
 import com.google.common.collect.Maps;
-import com.opennms.cassandra.lucidity.annotations.Column;
-import com.opennms.cassandra.lucidity.annotations.Entity;
-import com.opennms.cassandra.lucidity.annotations.Id;
-import com.opennms.cassandra.lucidity.annotations.Index;
-import com.opennms.cassandra.lucidity.annotations.OneToMany;
-import com.opennms.cassandra.lucidity.annotations.Table;
+import com.opennms.lucidity.annotations.Column;
+import com.opennms.lucidity.annotations.Entity;
+import com.opennms.lucidity.annotations.Id;
+import com.opennms.lucidity.annotations.Index;
+import com.opennms.lucidity.annotations.OneToMany;
+import com.opennms.lucidity.annotations.Table;
 
 // FIXME: support annotated methods, as well as fields.
 // FIXME: column names should default to property name when name is not set.

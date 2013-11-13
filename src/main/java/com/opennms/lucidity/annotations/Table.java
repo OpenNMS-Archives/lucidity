@@ -1,4 +1,4 @@
-package com.opennms.cassandra.lucidity.annotations;
+package com.opennms.lucidity.annotations;
 
 
 import java.lang.annotation.Target;

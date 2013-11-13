@@ -1,12 +1,11 @@
-package com.opennms.cassandra.lucidity;
+package com.opennms.lucidity;
 
-
-import com.opennms.cassandra.lucidity.annotations.Entity;
-import com.opennms.cassandra.lucidity.annotations.Id;
 
 import org.junit.Test;
 
-import com.opennms.cassandra.lucidity.Schema;
+import com.opennms.lucidity.Schema;
+import com.opennms.lucidity.annotations.Entity;
+import com.opennms.lucidity.annotations.Id;
 
 
 public class SchemaTest {
