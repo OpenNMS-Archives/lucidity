@@ -3,11 +3,11 @@ package com.opennms.lucidity;
 
 import java.util.UUID;
 
+import com.google.common.base.Objects;
 import com.opennms.lucidity.annotations.Column;
 import com.opennms.lucidity.annotations.Entity;
 import com.opennms.lucidity.annotations.Id;
 import com.opennms.lucidity.annotations.Table;
-import com.google.common.base.Objects;
 
 
 @Entity
@@ -80,6 +80,7 @@ class Address {
 
     @Override
     public boolean equals(Object other) {
+        if (other == null) return false;
         return hashCode() == ((Address) other).hashCode();
     }
 
