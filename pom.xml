@@ -86,9 +86,7 @@
       <plugin>
         <groupId>org.codehaus.mojo</groupId>
         <artifactId>cassandra-maven-plugin</artifactId>
-<!--         <version>2.0.2-ONMS-20131028-1</version> -->
-          <!-- FIXME sw: not publicly avaiblable -->
-        <version>2.0.2-2-SNAPSHOT</version>
+        <version>2.0.2-ONMS-20131113-1</version>
         <executions>
           <execution>
             <id>delete-cassandra</id>
