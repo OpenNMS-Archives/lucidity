@@ -56,7 +56,7 @@ import com.google.common.collect.Sets.SetView;
 
 // FIXME: create() should return an "attached" copy?  a difference instance?
 // FIXME: replace javax.persistence annotations with our own.
-// FIXME: Update instance cache from update() method
+// FIXME: static methods in Schema to format table / column names
 
 public class CassandraEntityStore implements EntityStore {
 
@@ -252,8 +252,8 @@ public class CassandraEntityStore implements EntityStore {
         }
 
         executeStatement(batchStatement, consistency);
+        cacheInstance(object);
 
-        // FIXME sw: objectCache should be updated?
     }
 
     @Override
