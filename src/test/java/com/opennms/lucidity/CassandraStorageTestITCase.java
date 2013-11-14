@@ -174,6 +174,11 @@ public class CassandraStorageTestITCase {
 
     }
 
+    @Test(expected = IllegalStateException.class)
+    public void testUpdateUntracked() {
+        m_entityStore.update(new User("Peter", "Griffin", "pgriffin@fox.com"));
+    }
+
     @Test
     public void testWithIndexedColumn() {
 
