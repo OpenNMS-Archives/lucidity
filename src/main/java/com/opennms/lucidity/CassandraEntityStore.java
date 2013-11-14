@@ -13,7 +13,9 @@ import static com.google.common.base.Throwables.propagate;
 import static com.opennms.lucidity.Schema.ENTITY;
 import static com.opennms.lucidity.Schema.ID;
 import static com.opennms.lucidity.Schema.INDEX;
+import static com.opennms.lucidity.Schema.indexTableName;
 import static com.opennms.lucidity.Schema.joinColumnName;
+import static com.opennms.lucidity.Schema.joinTableName;
 import static java.lang.String.format;
 
 import java.io.IOException;
@@ -47,14 +49,8 @@ import com.google.common.collect.Sets;
 import com.google.common.collect.Sets.SetView;
 
 
-// FIXME: Consider something from Guava for cache.
-// FIXME: Cache schemas?
+// FIXME: Cache schemas
 // FIXME: Support collection types.
-
-// ~~~~~~~~~~~~
-
-// FIXME: create() should return an "attached" copy?  a difference instance?
-// FIXME: static methods in Schema to format table / column names
 
 /**
  * Apache Cassandra implementation of {@link EntityStore}.
@@ -120,12 +116,11 @@ public class CassandraEntityStore implements EntityStore {
             insertStatement.value(columnName, schema.getColumnValue(columnName, object));
             
             if (entry.getValue().isAnnotationPresent(Schema.INDEX)) {
-                // FIXME sw: make all the %s*_suffix static String, at least the suffixes, also see Schema
-                String tableName = format("%s_%s_idx", schema.getTableName(), columnName);
+                String tableName = indexTableName(schema.getTableName(), columnName);
                 batch.add(
                         insertInto(tableName)
                             .value(columnName, Util.getFieldValue(f, object))
-                            .value(format("%s_id", schema.getTableName()), id)
+                            .value(joinColumnName(schema.getTableName()), id)
                 );
             }
         }
@@ -150,7 +145,7 @@ public class CassandraEntityStore implements EntityStore {
                             "encountered relation with null ID property (entity not persisted?)");
                 }
 
-                String joinTable = format("%s_%s", schema.getTableName(), s.getTableName());
+                String joinTable = joinTableName(schema.getTableName(), s.getTableName());
 
                 batch.add(
                         insertInto(joinTable)
@@ -206,8 +201,8 @@ public class CassandraEntityStore implements EntityStore {
                 // Update index, if applicable
                 if (schema.getColumns().get(columnName).isAnnotationPresent(INDEX)) {
                     batchStatement.add(
-                            QueryBuilder.update(format("%s_%s_idx", schema.getTableName(), columnName))
-                                    .with(set(format("%s_id", schema.getTableName()), schema.getIDValue(object)))
+                            QueryBuilder.update(indexTableName(schema.getTableName(), columnName))
+                                    .with(set(joinColumnName(schema.getTableName()), schema.getIDValue(object)))
                                     .where(eq(columnName, schema.getColumnValue(columnName, object)))
                     );
                 }
@@ -239,7 +234,7 @@ public class CassandraEntityStore implements EntityStore {
             SetView<?> toInsert = Sets.difference(Sets.newHashSet(current), Sets.newHashSet(past));
             SetView<?> toRemove = Sets.difference(Sets.newHashSet(past), Sets.newHashSet(current));
 
-            String joinTable = format("%s_%s", schema.getTableName(), s.getTableName());
+            String joinTable = joinTableName(schema.getTableName(), s.getTableName());
 
             for (Object o : toInsert) {
                 if (s.getIDValue(o) == null) {
@@ -301,8 +296,7 @@ public class CassandraEntityStore implements EntityStore {
             
             Schema s = entry.getValue();
             Collection<Object> relations = Lists.newArrayList();
-            // FIXME sw: suggestion, add a suffix
-            String joinTable = format("%s_%s", schema.getTableName(), s.getTableName());
+            String joinTable = joinTableName(schema.getTableName(), s.getTableName());
             Statement statement = select().from(joinTable).where(eq(joinColumnName(schema.getTableName()), id));
             statement.setConsistencyLevel(getDriverConsistencyLevel(consistency));
 
@@ -344,7 +338,7 @@ public class CassandraEntityStore implements EntityStore {
         T instance = Util.newInstance(cls);
 
         Schema schema = getSchema(instance);
-        Statement selectStatement = select(format("%s_id", schema.getTableName())).from(format("%s_%s_idx", schema.getTableName(), indexedName)).where(eq(indexedName, value));
+        Statement selectStatement = select(joinColumnName(schema.getTableName())).from(indexTableName(schema.getTableName(), indexedName)).where(eq(indexedName, value));
         selectStatement.setConsistencyLevel(getDriverConsistencyLevel(consistency));
         ResultSet results = executeStatement(selectStatement, consistency);
         Row row = results.one();
@@ -352,7 +346,7 @@ public class CassandraEntityStore implements EntityStore {
         checkState(results.isExhausted(), "query returned more than one row");
         if (row == null) return Optional.absent();
 
-        return read(cls, row.getUUID(format("%s_id", schema.getTableName())), consistency);
+        return read(cls, row.getUUID(joinColumnName(schema.getTableName())), consistency);
     }
 
     private <T> void cacheInstance(T inst) {
@@ -452,14 +446,14 @@ public class CassandraEntityStore implements EntityStore {
             Field f = entry.getValue();
 
             if (f.isAnnotationPresent(INDEX)) {
-                String tableName = format("%s_%s_idx", schema.getTableName(), columnName);
+                String tableName = indexTableName(schema.getTableName(), columnName);
                 batchStatement.add(QueryBuilder.delete().from(tableName).where(eq(columnName, Util.getFieldValue(f, obj))));
             }
         }
 
         // Remove one-to-many relationships
         for (Schema s : schema.getOneToManys().values()) {
-            String joinTable = format("%s_%s", schema.getTableName(), s.getTableName());
+            String joinTable = joinTableName(schema.getTableName(), s.getTableName());
             batchStatement.add(QueryBuilder.delete().from(joinTable)
                     .where(eq(joinColumnName(schema.getTableName()), schema.getIDValue(obj))));
         }

@@ -130,24 +130,22 @@ class Schema {
             
             if (entry.getValue().isAnnotationPresent(INDEX)) {
                 sb.append(format(
-                        "CREATE TABLE %s_%s_idx (%s %s PRIMARY KEY, %s_id uuid);%n",
-                        getTableName(),
-                        columnName,
+                        "CREATE TABLE %s (%s %s PRIMARY KEY, %s uuid);%n",
+                        indexTableName(getTableName(), columnName),
                         columnName,
                         CQL_TYPES.get(entry.getValue().getType()),
-                        getTableName()));
+                        joinColumnName(getTableName())));
             }
         }
 
         for (Schema s : getOneToManys().values()) {
             sb.append(format(
-                    "CREATE TABLE %s_%s (%s_id uuid, %s_id uuid, PRIMARY KEY(%s_id, %s_id));%n",
-                    getTableName(),
-                    s.getTableName(),
-                    getTableName(),
-                    s.getTableName(),
-                    getTableName(),
-                    s.getTableName()));
+                    "CREATE TABLE %s (%s uuid, %s uuid, PRIMARY KEY(%s, %s));%n",
+                    joinTableName(getTableName(), s.getTableName()),
+                    joinColumnName(getTableName()),
+                    joinColumnName(s.getTableName()),
+                    joinColumnName(getTableName()),
+                    joinColumnName(s.getTableName())));
         }
 
         return sb.toString();
@@ -247,6 +245,14 @@ class Schema {
 
     static String joinColumnName(String tableName) {
         return format("%s_id", tableName);
+    }
+
+    static String indexTableName(String tableName, String indexedName) {
+        return format("%s_%s_idx", tableName, indexedName);
+    }
+
+    static String joinTableName(String table0, String table1) {
+        return format("%s_%s", table0, table1);
     }
 
 }
