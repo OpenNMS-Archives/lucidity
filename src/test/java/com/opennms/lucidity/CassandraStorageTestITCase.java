@@ -63,7 +63,7 @@ public class CassandraStorageTestITCase {
 
         m_sampleAddresses = addresses;
         m_sampleUser = u;
-        m_entityStore = new CassandraEntityStoreFactory("localhost", 9042, "mapper_test", ConsistencyLevel.ONE).createEntityStore();
+        m_entityStore = new CassandraEntityStoreFactory("localhost", 9042, "lucidity_test", ConsistencyLevel.ONE).createEntityStore();
 
     }
 
