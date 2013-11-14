@@ -16,9 +16,13 @@
 package com.opennms.lucidity;
 
 
+import java.io.PrintStream;
+import java.util.UUID;
+
 import org.junit.Test;
 
 import com.opennms.lucidity.Schema;
+import com.opennms.lucidity.annotations.Column;
 import com.opennms.lucidity.annotations.Entity;
 import com.opennms.lucidity.annotations.Id;
 
@@ -36,6 +40,11 @@ public class SchemaTest {
         @Id private String id;
     }
 
+    @Entity private class InvalidColumn {
+        @Id private UUID id;
+        @Column PrintStream stream;
+    }
+
     @Test(expected = IllegalArgumentException.class)
     public void testNoArgConstructor() {
         Schema.fromClass(InvalidConstructor.class);
@@ -44,6 +53,11 @@ public class SchemaTest {
     @Test(expected = IllegalArgumentException.class)
     public void testIDType() {
         Schema.fromClass(InvalidID.class);
+    }
+
+    @Test(expected = IllegalArgumentException.class)
+    public void testBadType() {
+        Schema.fromClass(InvalidColumn.class);
     }
 
 }
