@@ -1,7 +1,9 @@
 package com.opennms.lucidity;
 
 
+import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
+import static com.google.common.base.Throwables.propagate;
 import static java.lang.String.format;
 
 import java.lang.annotation.Annotation;
@@ -16,7 +18,6 @@ import java.util.Date;
 import java.util.Map;
 import java.util.UUID;
 
-import com.google.common.base.Throwables;
 import com.google.common.collect.Maps;
 import com.opennms.lucidity.annotations.Column;
 import com.opennms.lucidity.annotations.Entity;
@@ -30,7 +31,6 @@ import com.opennms.lucidity.annotations.Table;
 
 // ~~~
 
-//FIXME: column names should default to property name when name is not set.
 //FIXME: fromObject should validate field types against CQL_TYPES.
 
 
@@ -186,7 +186,7 @@ class Schema {
                 
                 if (f.isAnnotationPresent(COLUMN)) {
                     Column c = f.getAnnotation(Column.class);
-                    idName = c.name();
+                    idName = c.name().equals("") ? DEFAULT_ID_NAME : c.name();
                 }
                 else {
                     idName = DEFAULT_ID_NAME;
@@ -203,15 +203,8 @@ class Schema {
             else if (f.isAnnotationPresent(COLUMN)) {
                 f.setAccessible(true);
                 Column c = f.getAnnotation(Column.class);
-                
-                try {
-                    f.setAccessible(true);
-                    // FIXME sw: check for empty name
-                    columns.put(c.name(), f);
-                }
-                catch (IllegalArgumentException e) {
-                    throw Throwables.propagate(e);
-                }
+                String name = c.name().equals("") ? f.getName() : c.name();
+                columns.put(name, f);
             }
             // OnToMany annotated fields
             else if (f.isAnnotationPresent(ONE_TO_MANY)) {
