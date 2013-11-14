@@ -38,11 +38,16 @@ public class SchemaTest {
 
     @Entity private class InvalidID {
         @Id private String id;
+        @Column String name;
     }
 
     @Entity private class InvalidColumn {
         @Id private UUID id;
         @Column PrintStream stream;
+    }
+
+    @Entity private class NoColumn {
+        @Id private UUID id;
     }
 
     @Test(expected = IllegalArgumentException.class)
@@ -58,6 +63,11 @@ public class SchemaTest {
     @Test(expected = IllegalArgumentException.class)
     public void testBadType() {
         Schema.fromClass(InvalidColumn.class);
+    }
+
+    @Test(expected = IllegalArgumentException.class)
+    public void testMissingColumn() {
+        Schema.fromClass(NoColumn.class);
     }
 
 }
