@@ -33,6 +33,9 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentMap;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import com.datastax.driver.core.ResultSet;
 import com.datastax.driver.core.Row;
 import com.datastax.driver.core.Session;
@@ -58,6 +61,8 @@ import com.google.common.collect.Sets.SetView;
  * @author eevans
  */
 public class CassandraEntityStore implements EntityStore {
+
+    private static final Logger LOG = LoggerFactory.getLogger(CassandraEntityStore.class);
 
     private final Session m_session;
     private final ConsistencyLevel m_consistency;
@@ -305,11 +310,13 @@ public class CassandraEntityStore implements EntityStore {
 
                 Optional<?> joined = read(s.getObjectType(), u);
 
-                // FIXME sw: should be fine, log (debug,trace) would be nice
-                // XXX: This will silently ignore negative hits, is that what we want?
                 if (joined.isPresent()) {
-                    relations.add(read(s.getObjectType(), u).get());
+                    relations.add(joined.get());
                 }
+                else {
+                    LOG.debug("Lookup for relation with ID {} failed, (skipping)", u);
+                }
+
             }
 
             Util.setFieldValue(entry.getKey(), instance, relations);
