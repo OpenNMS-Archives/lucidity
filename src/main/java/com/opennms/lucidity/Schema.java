@@ -3,7 +3,6 @@ package com.opennms.lucidity;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
-import static com.google.common.base.Throwables.propagate;
 import static java.lang.String.format;
 
 import java.lang.annotation.Annotation;
@@ -28,11 +27,6 @@ import com.opennms.lucidity.annotations.Table;
 
 // FIXME: support annotated methods, as well as fields.
 // FIXME: add collection types to CQL_TYPES.
-
-// ~~~
-
-//FIXME: fromObject should validate field types against CQL_TYPES.
-
 
 /**
  * Groks schema structure from an annotated Java object.
@@ -202,8 +196,12 @@ class Schema {
             // Column annotated fields
             else if (f.isAnnotationPresent(COLUMN)) {
                 f.setAccessible(true);
+
                 Column c = f.getAnnotation(Column.class);
                 String name = c.name().equals("") ? f.getName() : c.name();
+
+                checkArgument(CQL_TYPES.containsKey(f.getType()), format("invalid type: %s (%s)", f.getType(), name));
+
                 columns.put(name, f);
             }
             // OnToMany annotated fields
