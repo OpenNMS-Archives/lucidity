@@ -21,8 +21,10 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
+import java.io.IOException;
 import java.util.Date;
 import java.util.Set;
+import java.util.UUID;
 
 import org.junit.Before;
 import org.junit.Test;
@@ -224,6 +226,36 @@ public class CassandraStorageTestITCase {
         assertEquals(m_sampleUser.getId(), read.getId());
         assertEquals(m_sampleUser.getEmail(), read.getEmail());
 
+    }
+
+    @Test(expected = IllegalStateException.class)
+    public void testCreateOnClosedStore() throws IOException {
+        m_entityStore.close();
+        persistSampleUser();
+    }
+
+    @Test(expected = IllegalStateException.class)
+    public void testReadOnClosedStore() throws IOException {
+        m_entityStore.close();
+        m_entityStore.read(User.class, UUID.randomUUID());
+    }
+
+    @Test(expected = IllegalStateException.class)
+    public void testReadIndexedOnClosedStore() throws IOException {
+        m_entityStore.close();
+        m_entityStore.read(User.class, "email", "eevans@opennms.org");
+    }
+
+    @Test(expected = IllegalStateException.class)
+    public void testUpdateOnClosedStore() throws IOException {
+        m_entityStore.close();
+        m_entityStore.update(persistSampleUser());
+    }
+
+    @Test(expected = IllegalStateException.class)
+    public void testDeleteOnClosedStore() throws IOException {
+        m_entityStore.close();
+        m_entityStore.delete(persistSampleUser());
     }
 
     private User persistSampleUser() {
