@@ -50,7 +50,6 @@ import com.google.common.collect.Sets.SetView;
 // FIXME: Consider something from Guava for cache.
 // FIXME: Cache schemas?
 // FIXME: Support collection types.
-// FIXME: Implement anything for close()?
 
 // ~~~~~~~~~~~~
 
@@ -68,9 +67,12 @@ public class CassandraEntityStore implements EntityStore {
     private final ConsistencyLevel m_consistency;
     private final ConcurrentMap<Integer, Record> m_instanceCache = Maps.newConcurrentMap();
 
+    private boolean m_isOpen;
+
     public CassandraEntityStore(Session session, ConsistencyLevel consistency) {
         m_session = session;
         m_consistency = consistency;
+        m_isOpen = true;
     }
 
     private Schema getSchema(Object object) {
@@ -95,12 +97,13 @@ public class CassandraEntityStore implements EntityStore {
 
         checkNotNull(object, "object argument");
         checkNotNull(consistency, "consistency argument");
+        checkState(m_isOpen, format("%s is closed", getClass().getSimpleName()));
         checkArgument(
                 object.getClass().isAnnotationPresent(ENTITY),
                 format("%s not annotated with @%s", getClass().getSimpleName(), ENTITY.getCanonicalName()));
 
         Schema schema = getSchema(object);
-        
+
         checkArgument(
                 schema.getIDValue(object) == null,
                 format("property annotated with @%s must be null", ID.getCanonicalName()));
@@ -174,10 +177,14 @@ public class CassandraEntityStore implements EntityStore {
     @Override
     public <T> void update(T object, ConsistencyLevel consistency) {
 
+        checkNotNull(object, "object argument");
+        checkNotNull(consistency, "consistency argument");
+        checkState(m_isOpen, format("%s is closed", getClass().getSimpleName()));
+
         Record record = m_instanceCache.get(getInstanceID(object));
 
         if (record == null) {
-            throw new IllegalStateException("session is invalid");
+            throw new IllegalStateException("untracked object");
         }
 
         Schema schema = getSchema(object);
@@ -268,6 +275,11 @@ public class CassandraEntityStore implements EntityStore {
     @Override
     public <T> Optional<T> read(Class<T> cls, UUID id, ConsistencyLevel consistency) {
 
+        checkNotNull(cls, "class argument");
+        checkNotNull(id, "id argument");
+        checkNotNull(consistency, "consistency argument");
+        checkState(m_isOpen, format("%s is closed", getClass().getSimpleName()));
+
         T instance = Util.newInstance(cls);
 
         Schema schema = getSchema(instance);
@@ -322,6 +334,12 @@ public class CassandraEntityStore implements EntityStore {
 
     @Override
     public <T> Optional<T> read(Class<T> cls, String indexedName, Object value, ConsistencyLevel consistency) {
+
+        checkNotNull(cls, "class argument");
+        checkNotNull(indexedName, "indexedName argument");
+        checkNotNull(value, "value argument");
+        checkNotNull(consistency, "consistency level argument");
+        checkState(m_isOpen, format("%s is closed", getClass().getSimpleName()));
 
         T instance = Util.newInstance(cls);
 
@@ -420,6 +438,10 @@ public class CassandraEntityStore implements EntityStore {
     @Override
     public <T> void delete(T obj, ConsistencyLevel consistency) {
 
+        checkNotNull(obj, "object argument");
+        checkNotNull(consistency, "consistency level argument");
+        checkState(m_isOpen, format("%s is closed", getClass().getSimpleName()));
+
         Schema schema = getSchema(obj);
         Batch batchStatement = batch(QueryBuilder.delete().from(schema.getTableName())
                 .where(eq(schema.getIDName(), schema.getIDValue(obj))));
@@ -450,8 +472,7 @@ public class CassandraEntityStore implements EntityStore {
 
     @Override
     public void close() throws IOException {
-        // TODO Auto-generated method stub
-
+        m_isOpen = false;
     }
 
     private ResultSet executeStatement(Statement statement, ConsistencyLevel cl) {
