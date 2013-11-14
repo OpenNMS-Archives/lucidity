@@ -206,6 +206,11 @@ public class CassandraStorageTestITCase {
 
     }
 
+    @Test(expected = UnsupportedOperationException.class)
+    public void testIndexReadWithoutIndexedColumn() {
+        m_entityStore.read(Address.class, "city", "San Antonio");
+    }
+
     @Test
     public void testUpdateIndexedColumn() {
 

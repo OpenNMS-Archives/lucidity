@@ -122,6 +122,13 @@ class Schema {
         return Util.getFieldValue(m_columns.get(columnName), obj);
     }
 
+    boolean isIndexed(String columnName) {
+        if (!getColumns().containsKey(columnName)) {
+            return false;
+        }
+        return getColumns().get(columnName).isAnnotationPresent(INDEX);
+    }
+
     String toDDL() {
 
         StringBuilder sb = new StringBuilder();

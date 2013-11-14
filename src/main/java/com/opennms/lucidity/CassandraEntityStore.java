@@ -359,6 +359,11 @@ public class CassandraEntityStore implements EntityStore {
         T instance = Util.newInstance(cls);
 
         Schema schema = getSchema(instance);
+
+        if (!schema.isIndexed(indexedName)) {
+            throw new UnsupportedOperationException(format("unindexed or non-existent column '%s'", indexedName));
+        }
+
         Statement selectStatement = select(joinColumnName(schema.getTableName())).from(indexTableName(schema.getTableName(), indexedName)).where(eq(indexedName, value));
         selectStatement.setConsistencyLevel(getDriverConsistencyLevel(consistency));
         ResultSet results = executeStatement(selectStatement, consistency);
