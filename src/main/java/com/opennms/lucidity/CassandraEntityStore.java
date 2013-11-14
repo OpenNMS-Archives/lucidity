@@ -57,6 +57,11 @@ import com.google.common.collect.Sets.SetView;
 // FIXME: create() should return an "attached" copy?  a difference instance?
 // FIXME: static methods in Schema to format table / column names
 
+/**
+ * Apache Cassandra implementation of {@link EntityStore}.
+ * 
+ * @author eevans
+ */
 public class CassandraEntityStore implements EntityStore {
 
     private final Session m_session;

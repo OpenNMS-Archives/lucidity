@@ -26,9 +26,13 @@ import com.opennms.lucidity.annotations.OneToMany;
 import com.opennms.lucidity.annotations.Table;
 
 // FIXME: support annotated methods, as well as fields.
-// FIXME: column names should default to property name when name is not set.
-// FIXME: fromObject should validate field types against CQL_TYPES.
 // FIXME: add collection types to CQL_TYPES.
+
+// ~~~
+
+//FIXME: column names should default to property name when name is not set.
+//FIXME: fromObject should validate field types against CQL_TYPES.
+
 
 /**
  * Groks schema structure from an annotated Java object.
