@@ -19,7 +19,7 @@
 
   <modelVersion>4.0.0</modelVersion>
 
-  <groupId>com.opennms.cassandra</groupId>
+  <groupId>com.opennms</groupId>
   <artifactId>lucidity</artifactId>
   <version>1.0.0-SNAPSHOT</version>
   <packaging>jar</packaging>
