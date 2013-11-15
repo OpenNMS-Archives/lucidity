@@ -27,10 +27,140 @@
 
     <div id="content-wrapper">
       <div class="inner clearfix">
-        <section id="main-content">
-          <h3><a name="introduction" class="anchor" href="#introduction"><span class="octicon octicon-link"></span></a>Introduction</h3>
-          <script src="https://gist.github.com/eevans/966fc1bb0bea6654784b.js"></script>
-        </section>
+<section id="main-content">
+  <h1>
+    <a name="introduction" class="anchor" href="#introduction">
+      <span class="octicon octicon-link"></span></a>
+    Tutorial
+  </h1>
+
+  <p>
+    Lucidity allows you to model your data using ordinary Java objects.  Annotations are
+    used to define how objects should be mapped to tables, which (if any) attributes
+    will be indexed, and can even be used track one-to-many relationships between objects.
+  </p>
+  
+  <p>
+    The Rules:
+  </p>
+
+  <ul>
+    <li>The class must by annotated with <code>@Entity</code>.</li>
+    <li>The class must have a nullary constructor.</li>
+    <li>There must be exactly one field annotated with <code>@Id</code>, and it must be typed <code>java.util.UUID</code>.</li>
+    <li>There must be at least one field annotated with <code>@Column</code>.
+  </ul>
+
+  <h2>
+    <a name="example-1" class="anchor" href="#example-1">
+      <span class="octicon octicon-link"></span></a>
+    Example: User
+  </h2>
+  
+  <script src="https://gist.github.com/eevans/7490307.js"></script>
+  
+  <h3>
+    <a name="example-1-schema" class="anchor" href="#example-1-schema">
+            <span class="octicon octicon-link"></span></a>
+    The Schema
+  </h3>
+  
+  <p>
+    Cassandra schema isn't managed automatically by Lucidity, it must be created before you
+    can begin persisting objects.  For the User entity above, Lucidity will assume that the
+    table name matches the class name, and that the columns match the names of the corresponding
+    fields.  A CQL schema for User might look something like:
+  </p>
+  
+  <script src="https://gist.github.com/eevans/7491033.js"></script>
+
+  <p>
+    Lucidity can help with this by generating DDL that corresponds to your entities.  See
+    <a href="apidocs/com/opennms/lucidity/DDL.html">DDL</a> for a utility capable of
+    scanning the classpath for entities, and generating the table schema.
+  </p>
+
+  <h3>
+    <a name="example-2" class="anchor" href="#example-2">
+            <span class="octicon octicon-link"></span></a>
+    Entity Persistence
+  </h3>
+
+  <script src="https://gist.github.com/eevans/7490860.js"></script>
+
+  <p>
+    To persist a new entity, we first start by creating an <code>EntityStoreFactory</code>
+    using connection parameters for the Cassandra cluster, and a default consistency level.
+    <code>EntityStoreFactory</code> is thread-safe, it's where connection pooling occurs,
+    and only one should be created for the life of your application.
+    <code>EntityStoreFactory</code> is used to create an <code>EntityStore</code>, which in
+    turn is used to read and write entities.
+  </p>
+
+  <p>A few things to keep in mind:</p>
+  <ul>
+    <li>
+    <code>create()</code> will generate an new UUID for your <code>@Id</code>
+    field, so it is an error to assign one yourself.
+    </li>
+
+    <li>
+    <code>read()</code> returns an <a href="http://docs.guava-libraries.googlecode.com/git/javadoc/com/google/common/base/Optional.html">Optional</a>.  Use <a href="http://docs.guava-libraries.googlecode.com/git/javadoc/com/google/common/base/Optional.html#isPresent()">isPresent()</a>
+    to determine if a result exists, and <a href="http://docs.guava-libraries.googlecode.com/git/javadoc/com/google/common/base/Optional.html#get()">get()</a> to unwrap your entity if
+    it does.
+    </li>
+
+    <li>
+    <code>update()</code> results in an update of only those columns that have changed.  As
+    a result, it requires that you pass it an "attached" instance, one that was returned from
+    either <code>create()</code> or <code>read()</code>.
+    </li>
+  </ul>
+
+  <h3>
+    <a name="example-3-schema" class="anchor" href="#example-3-schema">
+            <span class="octicon octicon-link"></span></a>
+    Overriding schema
+  </h3>
+  <p>
+    So what happens if you already have a table of users and can't alter the schema,
+    or don't like the default naming?  Simply override them. 
+  </p>
+
+  <script src="https://gist.github.com/eevans/7491277.js"></script>
+
+  <h2>
+    <a name="example-2" class="anchor" href="#example-2">
+      <span class="octicon octicon-link"></span></a>
+    Example: Indexing
+  </h2>
+
+  <p>
+    In the example below, an inverted index is added to the email address column.
+  </p>
+
+  <script src="https://gist.github.com/eevans/7491931.js"></script>
+
+  <p>
+    Inverted indexes are maintained in a Cassandra as an additional table that maps
+    the indexed value to the ID of your entity.
+  </p>
+  
+  <h2>
+    <a name="example-3" class="anchor" href="#example-3">
+      <span class="octicon octicon-link"></span></a>
+    Example: One-to-many Relationships
+  </h2>
+
+  <p>
+    In the example below, a new entity, Address is introduced, and a one-to-many
+    relationship is established.
+  </p>
+
+  <script src="https://gist.github.com/eevans/7492077.js"></script>
+  <script src="https://gist.github.com/eevans/7492060.js"></script>
+  
+</section>
 
         <aside id="sidebar">
           <a href="tutorial.html" class="javadoc">Tutorial</a>
