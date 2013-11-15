@@ -31,25 +31,47 @@
           <h3>
 <a name="java-object-mapping-made-easy" class="anchor" href="#java-object-mapping-made-easy"><span class="octicon octicon-link"></span></a>Java object mapping made easy</h3>
 
-<p>Lucidity is an object mapper for Java and the <a href="http://cassandra.apache.org">Cassandra</a> database. </p>
+<p>Lucidity is an object mapper for Java and <a href="http://cassandra.apache.org">Cassandra</a>.  It sports a minimal set of features that are idiomatic to Java, and conform to Cassandra best-practice.</p>
 
-<h3>
-<a name="features" class="anchor" href="#features"><span class="octicon octicon-link"></span></a>Features</h3>
+<p>Features:</p>
 
 <ul>
-<li>Uses <a href="http://cassandra.apache.org/doc/cql3/CQL.html">CQL</a> and the native protocol</li>
 <li>Annotation-based</li>
+<li>One-to-many relationships</li>
+<li>Inverted indexes</li>
+<li>Uses <a href="http://cassandra.apache.org/doc/cql3/CQL.html">CQL3</a> and the native protocol</li>
+<li>DDL generation</li>
 </ul><h3>
 <a name="getting-started" class="anchor" href="#getting-started"><span class="octicon octicon-link"></span></a>Getting Started</h3>
 
-<pre><code>&lt;dependency&gt;
-  &lt;groupId&gt;com.opennms&lt;/groupId&gt;
-  &lt;artifactId&gt;lucidity&lt;/artifactId&gt;
-  &lt;version&gt;1.0.0-SNAPSHOT&lt;/version&gt;
-&lt;/dependency&gt;
+<p>Lucidity is not yet available from central Maven, but can be installed from the OpenNMS repository:</p>
+
+<pre><code>&lt;project&gt;
+...
+  &lt;dependencies&gt;
+    &lt;dependency&gt;
+      &lt;groupId&gt;com.opennms&lt;/groupId&gt;
+      &lt;artifactId&gt;lucidity&lt;/artifactId&gt;
+      &lt;version&gt;1.0.0-SNAPSHOT&lt;/version&gt;
+    &lt;/dependency&gt;
+  &lt;/dependencies&gt;
+...
+  &lt;pluginRepositories&gt;
+    &lt;pluginRepository&gt;
+      &lt;snapshots&gt;
+        &lt;enabled&gt;false&lt;/enabled&gt;
+      &lt;/snapshots&gt;
+      &lt;releases&gt;
+    &lt;enabled&gt;true&lt;/enabled&gt;
+      &lt;/releases&gt;
+      &lt;id&gt;opennms-repo&lt;/id&gt;
+      &lt;name&gt;OpenNMS Repository&lt;/name&gt;
+      &lt;url&gt;http://maven.opennms.org/content/groups/opennms.org-release&lt;/url&gt;
+    &lt;/pluginRepository&gt;
+  &lt;/pluginRepositories&gt;
+...
+&lt;/project&gt;
 </code></pre>
-
-
         </section>
 
         <aside id="sidebar">
@@ -69,6 +91,16 @@
       </div>
     </div>
 
-  
+            <script type="text/javascript">
+            var gaJsHost = (("https:" == document.location.protocol) ? "https://ssl." : "http://www.");
+            document.write(unescape("%3Cscript src='" + gaJsHost + "google-analytics.com/ga.js' type='text/javascript'%3E%3C/script%3E"));
+          </script>
+          <script type="text/javascript">
+            try {
+              var pageTracker = _gat._getTracker("&lt;script&gt;   (function(i,s,o,g,r,a,m){i[&#39;GoogleAnalyticsObject&#39;]=r;i[r]=i[r]||function(){   (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),   m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)   })(window,document,&#39;script&#39;,&#39;//www.google-analytics.com/analytics.js&#39;,&#39;ga&#39;);    ga(&#39;create&#39;, &#39;UA-45767137-1&#39;, &#39;opennms.github.io&#39;);   ga(&#39;send&#39;, &#39;pageview&#39;);  &lt;/script&gt;");
+            pageTracker._trackPageview();
+            } catch(err) {}
+          </script>
+
   </body>
 </html>
