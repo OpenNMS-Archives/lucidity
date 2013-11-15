@@ -103,6 +103,9 @@
         <groupId>org.codehaus.mojo</groupId>
         <artifactId>cassandra-maven-plugin</artifactId>
         <version>2.0.2-ONMS-20131113-1</version>
+        <configuration>
+          <stopPort>8123</stopPort>
+        </configuration>
         <executions>
           <execution>
             <id>delete-cassandra</id>
