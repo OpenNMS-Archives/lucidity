@@ -24,8 +24,8 @@
   <version>1.0.0-SNAPSHOT</version>
   <packaging>jar</packaging>
 
-  <name>Cassandra Object Persistance</name>
-  <url>http://www.opennms.com</url>
+  <name>Lucidity</name>
+  <url>http://opennms.github.io/lucidity/</url>
 
   <properties>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
