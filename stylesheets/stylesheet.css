@@ -112,7 +112,7 @@ header h2 {
 aside#sidebar {
   width: 200px;
   padding-left: 20px;
-  min-height: 584px;
+  min-height: 504px;
   float: right;
   background: transparent url(../images/sidebar-bg.jpg) 0 0 no-repeat;
   font-size: 12px;
@@ -142,16 +142,6 @@ a.button small {
   display: block;
   font-size: 11px;
 }
-a.javadoc {
-  width: 134px;
-  height: 58px;
-  line-height: 1.2;
-  font-size: 23px;
-  color: #fff;
-  padding-left: 68px;
-  padding-top: 22px;
-  font-family: 'Architects Daughter', 'Helvetica Neue', Helvetica, Arial, serif; 
-}
 header a.button {
   position: absolute;
   right: 0;
@@ -163,14 +153,6 @@ aside a.button {
   padding-left: 64px;
   display: block;
   background: transparent url(../images/download-button.png) 0 0 no-repeat;
-  margin-bottom: 20px;
-  font-size: 21px;
-}
-aside a.javadoc {
-  width: 138px;
-  padding-left: 64px;
-  display: block;
-  background: transparent url(../images/javadoc-button.png) 0 0 no-repeat;
   margin-bottom: 20px;
   font-size: 21px;
 }
@@ -229,6 +211,7 @@ th {
 
 td {
   border: 1px solid #ebebeb;
+  text-align: center; 
   font-weight: 300;
 }
 
