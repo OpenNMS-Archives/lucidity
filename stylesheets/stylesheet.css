@@ -112,7 +112,7 @@ header h2 {
 aside#sidebar {
   width: 200px;
   padding-left: 20px;
-  min-height: 584px;
+  min-height: 664px;
   float: right;
   background: transparent url(../images/sidebar-bg.jpg) 0 0 no-repeat;
   font-size: 12px;
@@ -229,7 +229,6 @@ th {
 
 td {
   border: 1px solid #ebebeb;
-  text-align: center; 
   font-weight: 300;
 }
 
