@@ -8,7 +8,7 @@ Usage
 -----
 
     // User.java
-    import javax.persistence.*;
+    import com.opennms.lucidity.annotations.*;
     
     @Entity
     @Table(name="users")
@@ -32,35 +32,35 @@ Objects persisted with Lucidity must:
 
   * Have a nullary (no-arg) constructor.
   * Be annotated with `@Entity`.
-  * Have exactly one property annotated with `@Id`, the type must be
-    `java.util.UUID`.
-  * Have at least one `@Column` annotated property.
+  * Have exactly one field annotated with `@Id`, the type must be `java.util.UUID`.
+  * Have at least one `@Column` annotated field.
 
 The `@Table` annotation is optional, if ommited the name of the class is
 used as the table name.  The `name` argument to `@Column` is also optional,
-and will default to the name of the property if unused.
+and will default to the field name if unused.
 
 _Note: Currently only field annoations are supported._
 
 
-    EntityStore storage = new CassandraEntityStore("localhost", 9042, "keyspace");
+    EntityStoreFactory factory = new CassandraEntityStoreFactory("localhost", 9042, "keyspace", ConsistencyLevel.QUORUM);
+    EntityStore storage = factory.createEntityStore();
     
     // Creating
     User user = new User(givenName, lastName);
-    Session<User> session = storage.create(user, ConsistencyLevel.QUORUM);
+    user = storage.create(user, ConsistencyLevel.QUORUM);
     
     // Updating
     user.setSurname(name);
-    storage.update(session);
+    storage.update(user);
     
     // Reading
-    Session<User> session = storage.read(User.class, id);
-    User user = session.get();
+    Optional<User> result = storage.read(User.class, id);
+    User user = result.get();
     
-`Session`s are returned by operations that read, or create entities and are
-used to track changes when making updates.  In the example above, the call
-to `EntityStore#update(Session)` would result in an `UPDATE` of only the
-`users.surname` column.
+`update(...)` requires an "attached" instance, an instance returned from either
+`create(...)` or `read(...)`.  The state of attached instances is perserved and
+used to serialize an `UPDATE` of only those columns that have changed.
+
 
 One-to-many Relationships
 -------------------------
@@ -131,8 +131,4 @@ Indexing
     
 Limitations
 -----------
- * There is (currently) only one type of index, `INVERTED`, and it maps a
-   one-to-one relationship between the column value, and the ID of the
-   object indexing it (`T read(Class<T>, String, Object)` assumes this as
-   well).
  * Only field annotations are (currently) supported.
