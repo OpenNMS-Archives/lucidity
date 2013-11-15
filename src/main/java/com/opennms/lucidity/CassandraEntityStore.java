@@ -260,9 +260,9 @@ public class CassandraEntityStore implements EntityStore {
                     throw new IllegalStateException(
                             "encountered relation with null ID property (entity not persisted?)");
                 }
-                batchStatement.add(insertInto(joinTable).value(
-                        joinColumnName(schema.getTableName()),
-                        schema.getIDValue(object)).value(joinColumnName(s.getTableName()), s.getIDValue(o)));
+                batchStatement.add(insertInto(joinTable)
+                        .value(joinColumnName(schema.getTableName()), schema.getIDValue(object))
+                        .value(joinColumnName(s.getTableName()), s.getIDValue(o)));
             }
 
             for (Object o : toRemove) {
@@ -270,9 +270,11 @@ public class CassandraEntityStore implements EntityStore {
                     throw new IllegalStateException(
                             "encountered relation with null ID property (entity not persisted?)");
                 }
-                batchStatement.add(QueryBuilder.delete().from(joinTable).where(
-                        eq(joinColumnName(schema.getTableName()), schema.getIDValue(object))).and(
-                        eq(joinColumnName(s.getTableName()), s.getIDValue(o))));
+                batchStatement.add(
+                        QueryBuilder.delete().from(joinTable)
+                            .where(eq(joinColumnName(schema.getTableName()), schema.getIDValue(object)))
+                                .and(eq(joinColumnName(s.getTableName()), s.getIDValue(o)))
+                );
             }
         }
 
@@ -480,8 +482,10 @@ public class CassandraEntityStore implements EntityStore {
         // Remove one-to-many relationships
         for (Schema s : schema.getOneToManys().values()) {
             String joinTable = joinTableName(schema.getTableName(), s.getTableName());
-            batchStatement.add(QueryBuilder.delete().from(joinTable)
-                    .where(eq(joinColumnName(schema.getTableName()), schema.getIDValue(obj))));
+            batchStatement.add(
+                    QueryBuilder.delete().from(joinTable)
+                        .where(eq(joinColumnName(schema.getTableName()), schema.getIDValue(obj)))
+            );
         }
 
         executeStatement(batchStatement, consistency);

@@ -173,7 +173,7 @@ class Schema {
     }
 
     static Schema fromClass(Class<?> cls) {
-        checkNotNull(cls, "object reference argument");
+        checkNotNull(cls, "class argument");
 
         if (!Util.getNoArgConstructor(cls).isPresent()) {
             throw new IllegalArgumentException(format("%s is missing nullary constructor.", cls.getCanonicalName()));
