@@ -20,6 +20,8 @@ import static com.google.common.base.Throwables.propagate;
 
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
+import java.lang.reflect.ParameterizedType;
+import java.lang.reflect.Type;
 
 import com.google.common.base.Optional;
 import com.google.common.base.Throwables;
@@ -89,6 +91,10 @@ class Util {
         catch (Exception e) {
             throw propagate(e);
         }
+    }
+
+    static Type[] getParameterizedTypes(Field f) {
+        return ((ParameterizedType)f.getGenericType()).getActualTypeArguments();
     }
 
 }

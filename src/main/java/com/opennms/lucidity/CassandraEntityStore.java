@@ -34,6 +34,7 @@ import static java.lang.String.format;
 
 import java.io.IOException;
 import java.lang.reflect.Field;
+import java.lang.reflect.Type;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.net.InetAddress;
@@ -429,8 +430,8 @@ public class CassandraEntityStore implements EntityStore {
                 f.set(obj, data.getLong(name));
             }
             else if (f.getType().equals(Map.class)) {
-                // FIXME: ...
-                throw new UnsupportedOperationException();
+                Type[] types = Util.getParameterizedTypes(f);
+                f.set(obj, data.getMap(name, (Class<?>)types[0], (Class<?>)types[1]));
             }
             else if (f.getType().equals(Set.class)) {
                 // FIXME: ...

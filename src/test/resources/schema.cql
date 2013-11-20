@@ -11,7 +11,8 @@ CREATE TABLE lucidity_test.users (
 	last_updated bigint,
 	created timestamp,
 	temperature double,
-	validated boolean
+	validated boolean,
+	favorites map<text, text>
 );
 
 CREATE TABLE lucidity_test.addresses (id uuid PRIMARY KEY, zipcode text, street text, city text);

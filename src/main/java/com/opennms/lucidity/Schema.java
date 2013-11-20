@@ -72,6 +72,7 @@ class Schema {
         CQL_TYPES.put(Long.TYPE, "bigint");
         CQL_TYPES.put(String.class, "text");
         CQL_TYPES.put(UUID.class, "uuid");
+        CQL_TYPES.put(Map.class, "map");
     }
 
     private final Class<?> m_type;
@@ -136,7 +137,7 @@ class Schema {
         sb.append("CREATE TABLE ").append(getTableName()).append(" (").append(getIDName()).append(" uuid PRIMARY KEY");
 
         for (Map.Entry<String, Field> entry : getColumns().entrySet()) {
-            sb.append(", ").append(entry.getKey()).append(" ").append(CQL_TYPES.get(entry.getValue().getType()));
+            sb.append(", ").append(entry.getKey()).append(" ").append(getDDLType(entry.getValue()));
         }
 
         sb.append(");").append(System.lineSeparator());
@@ -149,7 +150,7 @@ class Schema {
                         "CREATE TABLE %s (%s %s PRIMARY KEY, %s uuid);%n",
                         indexTableName(getTableName(), columnName),
                         columnName,
-                        CQL_TYPES.get(entry.getValue().getType()),
+                        getDDLType(entry.getValue()),
                         joinColumnName(getTableName())));
             }
         }
@@ -224,6 +225,17 @@ class Schema {
 
                 checkArgument(CQL_TYPES.containsKey(f.getType()), format("invalid type: %s (%s)", f.getType(), name));
 
+                // Validate map columns
+                if (f.getType().equals(Map.class)) {
+                    checkArgument(
+                            !f.isAnnotationPresent(INDEX),
+                            format("Cannot annotate Map with @%s", INDEX.getCanonicalName()));
+
+                    for (Type t : Util.getParameterizedTypes(f)) {
+                        checkArgument(CQL_TYPES.containsKey(t), format("unsupported parameter type: %s (%s)", t, name));
+                    }
+                }
+
                 columns.put(name, f);
             }
             // OnToMany annotated fields
@@ -266,6 +278,20 @@ class Schema {
 
     static String joinTableName(String table0, String table1) {
         return format("%s_%s", table0, table1);
+    }
+
+    private static String getDDLType(Field f) {
+        String ddlType;
+
+        if (f.getType().equals(Map.class)) {
+            Type[] t = Util.getParameterizedTypes(f);
+            ddlType = format("%s<%s, %s>", CQL_TYPES.get(f.getType()), CQL_TYPES.get(t[0]), CQL_TYPES.get(t[1]));
+        }
+        else {
+            ddlType = CQL_TYPES.get(f.getType());
+        }
+
+        return ddlType;
     }
 
 }

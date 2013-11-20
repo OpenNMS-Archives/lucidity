@@ -16,38 +16,48 @@
 package com.opennms.lucidity;
 
 
+import static com.opennms.lucidity.annotations.IndexType.INVERTED;
+
 import java.io.PrintStream;
+import java.util.Map;
 import java.util.UUID;
 
 import org.junit.Test;
 
-import com.opennms.lucidity.Schema;
 import com.opennms.lucidity.annotations.Column;
 import com.opennms.lucidity.annotations.Entity;
 import com.opennms.lucidity.annotations.Id;
+import com.opennms.lucidity.annotations.Index;
 
 
 public class SchemaTest {
 
-    @Entity private class InvalidConstructor {
-        @SuppressWarnings("unused")
-        InvalidConstructor(String argument) {
-
-        }
+    @Entity static class InvalidConstructor {
+        InvalidConstructor(String argument) {}
     }
 
-    @Entity private class InvalidID {
+    @Entity static class InvalidID {
         @Id private String id;
         @Column String name;
     }
 
-    @Entity private class InvalidColumn {
+    @Entity static class InvalidColumn {
         @Id private UUID id;
         @Column PrintStream stream;
     }
 
-    @Entity private class NoColumn {
+    @Entity static class NoColumn {
         @Id private UUID id;
+    }
+
+    @Entity static class WithIndexedMap {
+        @Id private UUID id;
+        @Index(type=INVERTED) @Column Map<String, String> food;
+    }
+
+    @Entity static class WithBadMapType {
+        @Id private UUID id;
+        @Column Map<String, Runnable> runners;
     }
 
     @Test(expected = IllegalArgumentException.class)
@@ -68,6 +78,16 @@ public class SchemaTest {
     @Test(expected = IllegalArgumentException.class)
     public void testMissingColumn() {
         Schema.fromClass(NoColumn.class);
+    }
+
+    @Test(expected = IllegalArgumentException.class)
+    public void testWithIndexedMap() {
+        Schema.fromClass(WithIndexedMap.class);
+    }
+
+    @Test(expected = IllegalArgumentException.class)
+    public void testWithBadMapType() {
+        Schema.fromClass(WithBadMapType.class);
     }
 
 }

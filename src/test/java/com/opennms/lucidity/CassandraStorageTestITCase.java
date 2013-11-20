@@ -60,6 +60,9 @@ public class CassandraStorageTestITCase {
         u.setTemperature(98.6);
         u.setValidated(true);
         u.setAddresses(Lists.newArrayList(addresses));
+        u.getFavorites().put("meat", "beef");
+        u.getFavorites().put("beverage", "beer");
+        u.getFavorites().put("simpson", "bart");
 
         m_sampleAddresses = addresses;
         m_sampleUser = u;
@@ -83,6 +86,9 @@ public class CassandraStorageTestITCase {
         assertEquals(m_sampleUser.isValidated(), user.isValidated());
         assertEquals(m_sampleUser.getTemperature(), user.getTemperature(), 0.0d);
 
+        assertEquals(m_sampleUser.getFavorites().size(), user.getFavorites().size());
+        assertEquals(m_sampleUser.getFavorites().get("simpson"), user.getFavorites().get("simpson"));
+        
     }
 
     @Test(expected = IllegalStateException.class)

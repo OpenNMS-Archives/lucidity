@@ -20,8 +20,10 @@ import static com.opennms.lucidity.annotations.IndexType.INVERTED;
 
 import java.util.Collection;
 import java.util.Date;
+import java.util.Map;
 import java.util.UUID;
 
+import com.google.common.collect.Maps;
 import com.opennms.lucidity.annotations.Column;
 import com.opennms.lucidity.annotations.Entity;
 import com.opennms.lucidity.annotations.Id;
@@ -63,6 +65,9 @@ class User {
     @Column(name = "temperature")
     private double m_temperature;
 
+    @Column(name = "favorites")
+    private Map<String, String> m_favorites = Maps.newHashMap();
+    
     @OneToMany
     private Collection<Address> m_addresses;
 
@@ -154,6 +159,14 @@ class User {
 
     void setAddresses(Collection<Address> addresses) {
         m_addresses = addresses;
+    }
+
+    Map<String, String> getFavorites() {
+        return m_favorites;
+    }
+
+    void setFavorites(Map<String, String> favorites) {
+        m_favorites = favorites;
     }
 
     @Override
