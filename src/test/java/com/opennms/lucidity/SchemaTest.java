@@ -25,6 +25,7 @@ import java.util.UUID;
 import org.junit.Test;
 
 import com.opennms.lucidity.annotations.Column;
+import com.opennms.lucidity.annotations.EmbeddedCollection;
 import com.opennms.lucidity.annotations.Entity;
 import com.opennms.lucidity.annotations.Id;
 import com.opennms.lucidity.annotations.Index;
@@ -52,12 +53,12 @@ public class SchemaTest {
 
     @Entity static class WithIndexedMap {
         @Id private UUID id;
-        @Index(type=INVERTED) @Column Map<String, String> food;
+        @Index(type=INVERTED) @EmbeddedCollection @Column Map<String, String> food;
     }
 
     @Entity static class WithBadMapType {
         @Id private UUID id;
-        @Column Map<String, Runnable> runners;
+        @EmbeddedCollection @Column Map<String, Runnable> runners;
     }
 
     @Test(expected = IllegalArgumentException.class)

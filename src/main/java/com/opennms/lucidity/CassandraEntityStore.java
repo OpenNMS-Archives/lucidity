@@ -208,7 +208,10 @@ public class CassandraEntityStore implements EntityStore {
         Update updateStatement = QueryBuilder.update(schema.getTableName());
         Batch batchStatement = batch();
 
-        for (String columnName : schema.getColumns().keySet()) {
+        // Begin with standard (i.e. non-collection) columns.
+        for (Entry<String, Field> entry : schema.getStandardColumns().entrySet()) {
+            String columnName = entry.getKey();
+            Field f = entry.getValue();
 
             Object past, current;
             current = schema.getColumnValue(columnName, object);
@@ -219,7 +222,7 @@ public class CassandraEntityStore implements EntityStore {
                 updateStatement.with(set(columnName, current));
 
                 // Update index, if applicable
-                if (schema.getColumns().get(columnName).isAnnotationPresent(INDEX)) {
+                if (f.isAnnotationPresent(INDEX)) {
                     batchStatement.add(
                             QueryBuilder.update(indexTableName(schema.getTableName(), columnName))
                                     .with(set(joinColumnName(schema.getTableName()), schema.getIDValue(object)))
@@ -235,6 +238,14 @@ public class CassandraEntityStore implements EntityStore {
             batchStatement.add(updateStatement);
         }
 
+        // Next, collection columns ...
+        for (Entry<String, Field> entry : schema.getCollectionColumns().entrySet()) {
+            String columnName = entry.getKey();
+            Field f = entry.getValue();
+
+        }
+
+        // Finally, process one-to-many mappings
         for (Map.Entry<Field, Schema> entry : schema.getOneToManys().entrySet()) {
             Field f = entry.getKey();
             Schema s = entry.getValue();
@@ -423,8 +434,7 @@ public class CassandraEntityStore implements EntityStore {
                 f.set(obj, data.getInt(name));
             }
             else if (f.getType().equals(List.class)) {
-                // FIXME: ...
-                throw new UnsupportedOperationException();
+                f.set(obj, data.getList(name, (Class<?>)Util.getParameterizedTypes(f)[0]));
             }
             else if (f.getType().equals(Long.TYPE)) {
                 f.set(obj, data.getLong(name));
@@ -434,8 +444,7 @@ public class CassandraEntityStore implements EntityStore {
                 f.set(obj, data.getMap(name, (Class<?>)types[0], (Class<?>)types[1]));
             }
             else if (f.getType().equals(Set.class)) {
-                // FIXME: ...
-                throw new UnsupportedOperationException();
+                f.set(obj, data.getSet(name, (Class<?>)Util.getParameterizedTypes(f)[0]));
             }
             else if (f.getType().equals(String.class)) {
                 f.set(obj, data.getString(name));

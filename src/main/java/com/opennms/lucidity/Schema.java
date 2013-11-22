@@ -29,11 +29,16 @@ import java.math.BigInteger;
 import java.net.InetAddress;
 import java.util.Collection;
 import java.util.Date;
+import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
+import com.google.common.base.Predicate;
 import com.google.common.collect.Maps;
+import com.google.common.collect.Sets;
 import com.opennms.lucidity.annotations.Column;
+import com.opennms.lucidity.annotations.EmbeddedCollection;
 import com.opennms.lucidity.annotations.Entity;
 import com.opennms.lucidity.annotations.Id;
 import com.opennms.lucidity.annotations.Index;
@@ -56,23 +61,32 @@ class Schema {
     static final Class<? extends Annotation> ONE_TO_MANY = OneToMany.class;
     static final Class<? extends Annotation> INDEX = Index.class;
     static final Class<? extends Annotation> TABLE = Table.class;
+    static final Class<? extends Annotation> COLLECTION = EmbeddedCollection.class;
     
     static final String DEFAULT_ID_NAME = "id";
-    static final Map<Class<?>, String> CQL_TYPES = Maps.newHashMap();
-    
+    static final Set<Class<?>> COLLECTION_TYPES = Sets.<Class<?>>newHashSet(Map.class, Set.class, List.class);
+    static final Map<Type, String> CQL_TYPES = Maps.newHashMap();
+
     static {
         CQL_TYPES.put(Boolean.TYPE, "boolean");
+        CQL_TYPES.put(Boolean.class, "boolean");
         CQL_TYPES.put(BigDecimal.class, "decimal");
         CQL_TYPES.put(BigInteger.class, "varint");
         CQL_TYPES.put(Date.class, "timestamp");
         CQL_TYPES.put(Double.TYPE, "double");
+        CQL_TYPES.put(Double.class, "double");
         CQL_TYPES.put(Float.TYPE, "float");
+        CQL_TYPES.put(Float.class, "float");
         CQL_TYPES.put(InetAddress.class, "inet");
         CQL_TYPES.put(Integer.TYPE, "int");
+        CQL_TYPES.put(Integer.class, "int");
         CQL_TYPES.put(Long.TYPE, "bigint");
+        CQL_TYPES.put(Long.class, "bigint");
         CQL_TYPES.put(String.class, "text");
         CQL_TYPES.put(UUID.class, "uuid");
         CQL_TYPES.put(Map.class, "map");
+        CQL_TYPES.put(Set.class, "set");
+        CQL_TYPES.put(List.class, "list");
     }
 
     private final Class<?> m_type;
@@ -130,6 +144,28 @@ class Schema {
         return getColumns().get(columnName).isAnnotationPresent(INDEX);
     }
 
+    /** Return all standard (read: non-collection) columns */
+    Map<String, Field> getStandardColumns() {
+        return Maps.filterValues(getColumns(), new Predicate<Field>() {
+
+            @Override
+            public boolean apply(Field input) {
+                return !isCassandraCollection(input.getType());
+            }
+        });
+    }
+
+    /** Return only collection columns (maps, lists, and sets). */
+    Map<String, Field> getCollectionColumns() {
+        return Maps.filterValues(getColumns(), new Predicate<Field>() {
+
+            @Override
+            public boolean apply(Field input) {
+                return isCassandraCollection(input.getType());
+            }
+        });
+    }
+
     String toDDL() {
 
         StringBuilder sb = new StringBuilder();
@@ -137,7 +173,7 @@ class Schema {
         sb.append("CREATE TABLE ").append(getTableName()).append(" (").append(getIDName()).append(" uuid PRIMARY KEY");
 
         for (Map.Entry<String, Field> entry : getColumns().entrySet()) {
-            sb.append(", ").append(entry.getKey()).append(" ").append(getDDLType(entry.getValue()));
+            sb.append(", ").append(entry.getKey()).append(" ").append(getCassandraTypeDDL(entry.getValue()));
         }
 
         sb.append(");").append(System.lineSeparator());
@@ -150,7 +186,7 @@ class Schema {
                         "CREATE TABLE %s (%s %s PRIMARY KEY, %s uuid);%n",
                         indexTableName(getTableName(), columnName),
                         columnName,
-                        getDDLType(entry.getValue()),
+                        getCassandraTypeDDL(entry.getValue()),
                         joinColumnName(getTableName())));
             }
         }
@@ -201,13 +237,7 @@ class Schema {
             if (f.isAnnotationPresent(ID)) {
                 f.setAccessible(true);
                 
-                if (f.isAnnotationPresent(COLUMN)) {
-                    Column c = f.getAnnotation(Column.class);
-                    idName = c.name().equals("") ? DEFAULT_ID_NAME : c.name();
-                }
-                else {
-                    idName = DEFAULT_ID_NAME;
-                }
+                idName = getColumnSchemaName(f, DEFAULT_ID_NAME);
 
                 if (!f.getType().equals(UUID.class)) {
                     throw new IllegalArgumentException(format("@%s must be of type UUID", ID.getCanonicalName()));
@@ -216,27 +246,43 @@ class Schema {
                 idField = f;
 
             }
+            // EmbeddedCollection annotated fields
+            else if (f.isAnnotationPresent(COLLECTION)) {
+                f.setAccessible(true);
+
+                checkArgument(
+                        isCassandraCollection(f.getType()),
+                        format("%s is an invalid type for @%s", f.getType(), COLLECTION.getCanonicalName()));
+
+                String name = getColumnSchemaName(f);
+
+                checkArgument(
+                        !f.isAnnotationPresent(INDEX),
+                        format("Cannot use @%s annotation on collection %s", INDEX.getCanonicalName(), name));
+
+                for (Type t : Util.getParameterizedTypes(f)) {
+                    checkArgument(
+                            isCassandraType(t),
+                            format("unsupported parameter type (%s) for collection %s", t, name));
+                }
+
+                columns.put(name, f);
+
+            }
             // Column annotated fields
             else if (f.isAnnotationPresent(COLUMN)) {
                 f.setAccessible(true);
 
-                Column c = f.getAnnotation(Column.class);
-                String name = c.name().equals("") ? f.getName() : c.name();
+                checkArgument(
+                        !isCassandraCollection(f.getType()),
+                        format("%s is invalid for standard column (missing @%s annotation?)", f.getType().getCanonicalName(), COLLECTION.getCanonicalName()));
 
-                checkArgument(CQL_TYPES.containsKey(f.getType()), format("invalid type: %s (%s)", f.getType(), name));
+                String name = getColumnSchemaName(f);
 
-                // Validate map columns
-                if (f.getType().equals(Map.class)) {
-                    checkArgument(
-                            !f.isAnnotationPresent(INDEX),
-                            format("Cannot annotate Map with @%s", INDEX.getCanonicalName()));
-
-                    for (Type t : Util.getParameterizedTypes(f)) {
-                        checkArgument(CQL_TYPES.containsKey(t), format("unsupported parameter type: %s (%s)", t, name));
-                    }
-                }
+                checkArgument(isCassandraType(f.getType()), format("invalid type: %s (%s)", f.getType(), name));
 
                 columns.put(name, f);
+
             }
             // OnToMany annotated fields
             else if (f.isAnnotationPresent(ONE_TO_MANY)) {
@@ -244,7 +290,7 @@ class Schema {
 
                 if (!f.getType().equals(Collection.class)) {
                     throw new IllegalArgumentException(
-                            format("Fields annotated with @%s must be of type Collection", ONE_TO_MANY.getCanonicalName()));
+                            format("Fields annotated with @%s must be of type EmbeddedCollection", ONE_TO_MANY.getCanonicalName()));
                 }
 
                 Type type = ((ParameterizedType)f.getGenericType()).getActualTypeArguments()[0];
@@ -280,18 +326,45 @@ class Schema {
         return format("%s_%s", table0, table1);
     }
 
-    private static String getDDLType(Field f) {
-        String ddlType;
+    private static boolean isCassandraCollection(Type type) {
+        return COLLECTION_TYPES.contains(type);
+    }
 
-        if (f.getType().equals(Map.class)) {
+    private static String getCassandraTypeDDL(Field f) {
+
+        Type type = f.getType();
+
+        if (type.equals(Map.class)) {
             Type[] t = Util.getParameterizedTypes(f);
-            ddlType = format("%s<%s, %s>", CQL_TYPES.get(f.getType()), CQL_TYPES.get(t[0]), CQL_TYPES.get(t[1]));
+            return format("%s<%s, %s>", CQL_TYPES.get(type), CQL_TYPES.get(t[0]), CQL_TYPES.get(t[1]));
+        }
+        else if (type.equals(Set.class) || type.equals(List.class)) {
+            return format("%s<%s>", CQL_TYPES.get(type), CQL_TYPES.get(Util.getParameterizedTypes(f)[0]));
         }
         else {
-            ddlType = CQL_TYPES.get(f.getType());
+            return CQL_TYPES.get(type);
         }
 
-        return ddlType;
+    }
+
+    private static boolean isCassandraType(Type type) {
+        return CQL_TYPES.containsKey(type);
+    }
+
+    private static String getColumnSchemaName(Field f) {
+        return getColumnSchemaName(f, f.getName());
+    }
+
+    private static String getColumnSchemaName(Field f, String def) {
+        
+        String name = def;
+        
+        if (f.isAnnotationPresent(COLUMN)) {
+            Column c = f.getAnnotation(Column.class);
+            if (!c.name().equals("")) name = c.name();
+        }
+        
+        return name;
     }
 
 }

@@ -25,6 +25,7 @@ import java.util.UUID;
 
 import com.google.common.collect.Maps;
 import com.opennms.lucidity.annotations.Column;
+import com.opennms.lucidity.annotations.EmbeddedCollection;
 import com.opennms.lucidity.annotations.Entity;
 import com.opennms.lucidity.annotations.Id;
 import com.opennms.lucidity.annotations.Index;
@@ -65,6 +66,7 @@ class User {
     @Column(name = "temperature")
     private double m_temperature;
 
+    @EmbeddedCollection
     @Column(name = "favorites")
     private Map<String, String> m_favorites = Maps.newHashMap();
     
