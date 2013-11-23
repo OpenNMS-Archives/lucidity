@@ -38,9 +38,19 @@ public class SchemaTest {
         InvalidConstructor(String argument) {}
     }
 
+    @Test(expected = IllegalArgumentException.class)
+    public void testNoArgConstructor() {
+        Schema.fromClass(InvalidConstructor.class);
+    }
+
     @Entity static class InvalidID {
         @Id private String id;
         @Column String name;
+    }
+
+    @Test(expected = IllegalArgumentException.class)
+    public void testInvalidID() {
+        Schema.fromClass(InvalidID.class);
     }
 
     @Entity static class InvalidColumn {
@@ -48,8 +58,18 @@ public class SchemaTest {
         @Column PrintStream stream;
     }
 
-    @Entity static class NoColumn {
+    @Test(expected = IllegalArgumentException.class)
+    public void testInvalidColumn() {
+        Schema.fromClass(InvalidColumn.class);
+    }
+
+    @Entity static class MissingColumn {
         @Id private UUID id;
+    }
+
+    @Test(expected = IllegalArgumentException.class)
+    public void testMissingColumn() {
+        Schema.fromClass(MissingColumn.class);
     }
 
     @Entity static class WithIndexedMap {
@@ -57,34 +77,14 @@ public class SchemaTest {
         @Index(type=INVERTED) @EmbeddedCollection @Column Map<String, String> food;
     }
 
-    @Entity static class WithBadMapType {
-        @Id private UUID id;
-        @EmbeddedCollection @Column Map<String, Runnable> runners;
-    }
-
-    @Test(expected = IllegalArgumentException.class)
-    public void testNoArgConstructor() {
-        Schema.fromClass(InvalidConstructor.class);
-    }
-
-    @Test(expected = IllegalArgumentException.class)
-    public void testIDType() {
-        Schema.fromClass(InvalidID.class);
-    }
-
-    @Test(expected = IllegalArgumentException.class)
-    public void testBadType() {
-        Schema.fromClass(InvalidColumn.class);
-    }
-
-    @Test(expected = IllegalArgumentException.class)
-    public void testMissingColumn() {
-        Schema.fromClass(NoColumn.class);
-    }
-
     @Test(expected = IllegalArgumentException.class)
     public void testWithIndexedMap() {
         Schema.fromClass(WithIndexedMap.class);
+    }
+
+    @Entity static class WithBadMapType {
+        @Id private UUID id;
+        @EmbeddedCollection @Column Map<String, Runnable> runners;
     }
 
     @Test(expected = IllegalArgumentException.class)
@@ -101,5 +101,5 @@ public class SchemaTest {
     public void testBadListColumn() {
         Schema.fromClass(BadListColumn.class);
     }
-    
+
 }
