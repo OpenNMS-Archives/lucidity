@@ -19,6 +19,7 @@ package com.opennms.lucidity;
 import static com.opennms.lucidity.annotations.IndexType.INVERTED;
 
 import java.io.PrintStream;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
@@ -91,4 +92,14 @@ public class SchemaTest {
         Schema.fromClass(WithBadMapType.class);
     }
 
+    @Entity static class BadListColumn {
+        @Id private UUID id;
+        @EmbeddedCollection List<Double> things;
+    }
+    
+    @Test(expected = IllegalArgumentException.class)
+    public void testBadListColumn() {
+        Schema.fromClass(BadListColumn.class);
+    }
+    
 }

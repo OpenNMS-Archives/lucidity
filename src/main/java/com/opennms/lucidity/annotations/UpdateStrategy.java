@@ -19,5 +19,5 @@ package com.opennms.lucidity.annotations;
 
 
 public enum UpdateStrategy {
-    ELEMENT, ALL;
+    ELEMENT, COLLECTION;
 }

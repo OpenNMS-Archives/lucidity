@@ -12,7 +12,11 @@ CREATE TABLE lucidity_test.users (
 	created timestamp,
 	temperature double,
 	validated boolean,
-	favorites map<text, text>
+	favorites map<text, text>,
+	status map<text, text>,
+	days set<text>,
+	schedule set<text>,
+	scores list<int>
 );
 
 CREATE TABLE lucidity_test.addresses (id uuid PRIMARY KEY, zipcode text, street text, city text);

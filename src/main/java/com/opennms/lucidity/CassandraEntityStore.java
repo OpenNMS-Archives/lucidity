@@ -15,9 +15,11 @@
  */
 package com.opennms.lucidity;
 
+import static com.datastax.driver.core.querybuilder.QueryBuilder.addAll;
 import static com.datastax.driver.core.querybuilder.QueryBuilder.batch;
 import static com.datastax.driver.core.querybuilder.QueryBuilder.eq;
 import static com.datastax.driver.core.querybuilder.QueryBuilder.insertInto;
+import static com.datastax.driver.core.querybuilder.QueryBuilder.removeAll;
 import static com.datastax.driver.core.querybuilder.QueryBuilder.select;
 import static com.datastax.driver.core.querybuilder.QueryBuilder.set;
 import static com.google.common.base.Preconditions.checkArgument;
@@ -51,12 +53,15 @@ import java.util.concurrent.ConcurrentMap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.datastax.driver.core.RegularStatement;
 import com.datastax.driver.core.ResultSet;
 import com.datastax.driver.core.Row;
 import com.datastax.driver.core.Session;
 import com.datastax.driver.core.Statement;
 import com.datastax.driver.core.exceptions.DriverException;
 import com.datastax.driver.core.querybuilder.Batch;
+import com.datastax.driver.core.querybuilder.Clause;
+import com.datastax.driver.core.querybuilder.Delete;
 import com.datastax.driver.core.querybuilder.Insert;
 import com.datastax.driver.core.querybuilder.QueryBuilder;
 import com.datastax.driver.core.querybuilder.Update;
@@ -65,6 +70,8 @@ import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 import com.google.common.collect.Sets.SetView;
+import com.opennms.lucidity.annotations.EmbeddedCollection;
+import com.opennms.lucidity.annotations.UpdateStrategy;
 
 
 // FIXME: Cache schemas
@@ -243,6 +250,34 @@ public class CassandraEntityStore implements EntityStore {
             String columnName = entry.getKey();
             Field f = entry.getValue();
 
+            Object past, current;
+            current = schema.getColumnValue(columnName, object);
+            past = record.getColumns().get(columnName);
+
+            if (current != null && !current.equals(past)) {
+                EmbeddedCollection collection = f.getAnnotation(EmbeddedCollection.class);
+
+                if (collection.updateStrategy().equals(UpdateStrategy.ELEMENT)) {
+                    Collection<RegularStatement> statements = diffCollection(
+                            schema.getTableName(),
+                            columnName,
+                            eq(schema.getIDName(), schema.getIDValue(object)),
+                            past,
+                            current);
+                    for (RegularStatement statement : statements) {
+                        batchStatement.add(statement);
+                    }
+                }
+                else {
+                    batchStatement.add(
+                            insertInto(schema.getTableName())
+                                .value(columnName, current)
+                                .value(schema.getIDName(), schema.getIDValue(object))
+                    );
+                }
+
+            }
+
         }
 
         // Finally, process one-to-many mappings
@@ -293,6 +328,74 @@ public class CassandraEntityStore implements EntityStore {
         executeStatement(batchStatement, consistency);
         cacheInstance(object);
 
+    }
+
+    private Collection<RegularStatement> diffCollection(String table, String column, Clause whereClause, Object past, Object present) {
+        if (past instanceof Set<?>) {
+            return diffSet(table, column, whereClause, (Set<?>) past, (Set<?>) present);
+        }
+        else if (past instanceof Map<?, ?>) {
+            return diffMap(table, column, whereClause, (Map<?, ?>) past, (Map<?, ?>) present);
+        }
+        else {
+            throw new RuntimeException("unknown collection type!");
+        }
+    }
+
+    private Collection<RegularStatement> diffSet(String table, String column, Clause whereClause, Set<?> past,
+            Set<?> present) {
+
+        List<RegularStatement> queries = Lists.newArrayList();
+
+        Set<?> removes = Sets.newHashSet(past);
+        removes.removeAll(present);
+
+        if (!removes.isEmpty()) {
+            queries.add(QueryBuilder.update(table).with(removeAll(column, removes)).where(whereClause));
+        }
+
+        Set<?> adds = Sets.newHashSet(present);
+        adds.removeAll(past);
+
+        if (!adds.isEmpty()) {
+            queries.add(QueryBuilder.update(table).with(addAll(column, adds)).where(whereClause));
+        }
+
+        return queries;
+    }
+
+    private Collection<RegularStatement> diffMap(String table, String column, Clause whereClause, Map<?, ?> past,
+            Map<?, ?> present) {
+
+        List<RegularStatement> queries = Lists.newArrayList();
+
+        Set<?> removed = Sets.newHashSet(past.keySet());
+        removed.removeAll(present.keySet());
+
+        if (!removed.isEmpty()) {
+            Delete.Selection delete = QueryBuilder.delete();
+
+            for (Object o : removed) {
+                delete.mapElt(column, o);
+            }
+
+            queries.add(delete.from(table).where(whereClause));
+        }
+
+        Set<Entry<?, ?>> changed = Sets.<Entry<?, ?>> newHashSet(present.entrySet());
+        changed.removeAll(past.entrySet());
+
+        if (!changed.isEmpty()) {
+            Update update = QueryBuilder.update(table);
+
+            for (Entry<?, ?> entry : changed) {
+                update.with(QueryBuilder.put(column, entry.getKey(), entry.getValue()));
+            }
+
+            queries.add(update.where(whereClause));
+        }
+
+        return queries;
     }
 
     @Override
@@ -394,7 +497,7 @@ public class CassandraEntityStore implements EntityStore {
         Record record = new Record(schema.getIDValue(inst));
 
         for (String columnName : schema.getColumns().keySet()) {
-            record.putColumn(columnName, schema.getColumnValue(columnName, inst));
+            record.putColumn(columnName, copyOf(schema.getColumnValue(columnName, inst)));
         }
 
         for (Field f : schema.getOneToManys().keySet()) {
@@ -404,6 +507,21 @@ public class CassandraEntityStore implements EntityStore {
 
         m_instanceCache.put(getInstanceID(inst), record);
 
+    }
+
+    private Object copyOf(Object obj) {
+        if (obj instanceof Map) {
+            return Maps.newHashMap((Map<?, ?>)obj);
+        }
+        else if (obj instanceof Set) {
+            return Sets.newHashSet((Set<?>)obj);
+        }
+        else if (obj instanceof List) {
+            return Lists.newArrayList((List<?>)obj);
+        }
+        else {
+            return obj;
+        }
     }
 
     private void setColumn(Object obj, String name, Field f, Row data) {

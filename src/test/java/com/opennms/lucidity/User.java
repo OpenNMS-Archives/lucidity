@@ -20,10 +20,14 @@ import static com.opennms.lucidity.annotations.IndexType.INVERTED;
 
 import java.util.Collection;
 import java.util.Date;
+import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
+import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
+import com.google.common.collect.Sets;
 import com.opennms.lucidity.annotations.Column;
 import com.opennms.lucidity.annotations.EmbeddedCollection;
 import com.opennms.lucidity.annotations.Entity;
@@ -31,6 +35,7 @@ import com.opennms.lucidity.annotations.Id;
 import com.opennms.lucidity.annotations.Index;
 import com.opennms.lucidity.annotations.OneToMany;
 import com.opennms.lucidity.annotations.Table;
+import com.opennms.lucidity.annotations.UpdateStrategy;
 
 
 @Entity
@@ -69,6 +74,22 @@ class User {
     @EmbeddedCollection
     @Column(name = "favorites")
     private Map<String, String> m_favorites = Maps.newHashMap();
+
+    @EmbeddedCollection(updateStrategy = UpdateStrategy.COLLECTION)
+    @Column(name = "status")
+    private Map<String, String> m_status = Maps.newHashMap();
+
+    @EmbeddedCollection
+    @Column(name = "days")
+    private Set<String> m_days = Sets.newHashSet();
+
+    @EmbeddedCollection(updateStrategy = UpdateStrategy.COLLECTION)
+    @Column(name = "schedule")
+    private Set<String> m_schedule = Sets.newHashSet();
+
+    @EmbeddedCollection(updateStrategy = UpdateStrategy.COLLECTION)
+    @Column(name = "scores")
+    private List<Integer> m_scores = Lists.newArrayList();
     
     @OneToMany
     private Collection<Address> m_addresses;
@@ -171,9 +192,41 @@ class User {
         m_favorites = favorites;
     }
 
+    Set<String> getDays() {
+        return m_days;
+    }
+
+    void setDays(Set<String> days) {
+        m_days = days;
+    }
+
+    List<Integer> getScores() {
+        return m_scores;
+    }
+
+    void setScores(List<Integer> scores) {
+        m_scores = scores;
+    }
+
+    Map<String, String> getStatus() {
+        return m_status;
+    }
+
+    void setStatus(Map<String, String> status) {
+        m_status = status;
+    }
+
+    Set<String> getSchedule() {
+        return m_schedule;
+    }
+
+    void setSchedule(Set<String> schedule) {
+        m_schedule = schedule;
+    }
+
     @Override
     public String toString() {
         return String.format("%s[addresses=%s]", getClass().getSimpleName(), getAddresses());
     }
-    
+
 }

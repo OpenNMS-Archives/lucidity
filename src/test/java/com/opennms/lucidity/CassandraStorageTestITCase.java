@@ -22,6 +22,7 @@ import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
 import java.io.IOException;
+import java.util.Arrays;
 import java.util.Date;
 import java.util.Set;
 import java.util.UUID;
@@ -63,6 +64,17 @@ public class CassandraStorageTestITCase {
         u.getFavorites().put("meat", "beef");
         u.getFavorites().put("beverage", "beer");
         u.getFavorites().put("simpson", "bart");
+        u.getDays().add("monday");
+        u.getDays().add("tuesday");
+        u.getDays().add("wednesday");
+        u.getScores().add(1);
+        u.getScores().add(2);
+        u.getScores().add(4);
+        u.getStatus().put("calm", "damaged");
+        u.getStatus().put("patience", "limited");
+        u.getSchedule().add("monday");
+        u.getSchedule().add("wednesday");
+        u.getSchedule().add("friday");
 
         m_sampleAddresses = addresses;
         m_sampleUser = u;
@@ -88,7 +100,16 @@ public class CassandraStorageTestITCase {
 
         assertEquals(m_sampleUser.getFavorites().size(), user.getFavorites().size());
         assertEquals(m_sampleUser.getFavorites().get("simpson"), user.getFavorites().get("simpson"));
-        
+
+        assertEquals(m_sampleUser.getDays().size(), user.getDays().size());
+        assertTrue(user.getDays().contains("monday"));
+
+        assertEquals(m_sampleUser.getScores().size(), user.getScores().size());
+        assertEquals(m_sampleUser.getScores().get(2), user.getScores().get(2));
+
+        assertEquals(m_sampleUser.getStatus().size(), user.getStatus().size());
+        assertTrue(user.getStatus().containsKey("calm"));
+
     }
 
     @Test(expected = IllegalStateException.class)
@@ -105,12 +126,20 @@ public class CassandraStorageTestITCase {
         User created = m_entityStore.create(user);
 
         user.setEmail("eevans@opennms.org");
+        user.setAge(31);
+        user.setLastUpdated(System.currentTimeMillis());
+        user.setTemperature(99.9);
+        user.setValidated(false);
 
         m_entityStore.update(created);
 
         User read = get(m_entityStore.read(User.class, user.getId()));
 
         assertEquals(user.getEmail(), read.getEmail());
+        assertEquals(user.getAge(), read.getAge());
+        assertEquals(user.getLastUpdated(), read.getLastUpdated());
+        assertEquals(user.getTemperature(), read.getTemperature(), 0.0d);
+        assertEquals(user.isValidated(), read.isValidated());
 
     }
 
@@ -262,6 +291,123 @@ public class CassandraStorageTestITCase {
     public void testDeleteOnClosedStore() throws IOException {
         m_entityStore.close();
         m_entityStore.delete(persistSampleUser());
+    }
+
+    @Test
+    public void testUpdateMapColumnElementStrategy() {
+
+        User inst0, inst1;
+
+        inst0 = persistSampleUser();
+        inst1 = get(m_entityStore.read(User.class, inst0.getId()));
+
+        inst0.getFavorites().put("beverage", "ale");
+        inst0.getFavorites().remove("simpson");
+        inst1.getFavorites().put("metal", "progressive");
+
+        m_entityStore.update(inst0);
+        m_entityStore.update(inst1);
+
+        User read = get(m_entityStore.read(User.class, inst0.getId()));
+
+        assertTrue(read.getFavorites().containsKey("beverage"));
+        assertEquals("ale", read.getFavorites().get("beverage"));
+        assertTrue(!read.getFavorites().containsKey("simpson"));
+        assertTrue(read.getFavorites().containsKey("metal"));
+
+    }
+
+    @Test
+    public void testUpdateMapColumnAllStrategy() {
+
+        User inst0, inst1;
+
+        inst0 = persistSampleUser();
+        inst1 = get(m_entityStore.read(User.class, inst0.getId()));
+
+        inst0.getStatus().put("curiosity", "piqued");
+        inst1.getStatus().put("mood", "mellowing");
+
+        m_entityStore.update(inst0);
+        m_entityStore.update(inst1);
+
+        User read = get(m_entityStore.read(User.class, inst0.getId()));
+
+        assertEquals(3, read.getStatus().size());
+        assertFalse(read.getStatus().containsKey("curiosity"));
+        assertTrue(read.getStatus().containsKey("mood"));
+        assertEquals("mellowing", read.getStatus().get("mood"));
+
+    }
+
+    @Test
+    public void testUpdateSetColumnElementStrategy() {
+
+        User inst0, inst1;
+
+        inst0 = persistSampleUser();
+        inst1 = get(m_entityStore.read(User.class, inst0.getId()));
+
+        inst0.getDays().add("friday");
+        inst0.getDays().remove("tuesday");
+        inst1.getDays().add("saturday");
+
+        m_entityStore.update(inst0);
+        m_entityStore.update(inst1);
+
+        User read = get(m_entityStore.read(User.class, inst0.getId()));
+
+        assertEquals(4, read.getDays().size());
+        assertTrue(read.getDays().contains("monday"));
+        assertTrue(read.getDays().contains("wednesday"));
+        assertTrue(read.getDays().contains("friday"));
+        assertTrue(read.getDays().contains("saturday"));
+
+    }
+
+    @Test
+    public void testUpdateSetColumnAllStrategy() {
+
+        User inst0, inst1;
+
+        inst0 = persistSampleUser();
+        inst1 = get(m_entityStore.read(User.class, inst0.getId()));
+
+        inst0.getSchedule().remove("monday");
+        inst0.getSchedule().add("tuesday");
+        inst1.getSchedule().add("saturday");
+        inst1.getSchedule().add("sunday");
+        inst1.getSchedule().remove("wednesday");
+
+        m_entityStore.update(inst0);
+        m_entityStore.update(inst1);
+
+        User read = get(m_entityStore.read(User.class, inst0.getId()));
+
+        assertEquals(4, read.getSchedule().size());
+        assertTrue(read.getSchedule().contains("sunday"));
+        assertTrue(read.getSchedule().contains("monday"));
+        assertTrue(read.getSchedule().contains("friday"));
+        assertTrue(read.getSchedule().contains("saturday"));
+
+    }
+
+    @Test
+    public void testUpdateListColumn() { // COLLECTION update strategy
+
+        User sample = persistSampleUser();
+
+        sample.setScores(Arrays.asList(new Integer[] { 8, 16, 32 }));
+
+        m_entityStore.update(sample);
+
+        User read = get(m_entityStore.read(User.class, sample.getId()));
+
+        assertEquals(3, read.getScores().size());
+        assertEquals(Integer.valueOf(8), read.getScores().get(0));
+        assertEquals(Integer.valueOf(16), read.getScores().get(1));
+        assertEquals(Integer.valueOf(32), read.getScores().get(2));
+
     }
 
     private User persistSampleUser() {

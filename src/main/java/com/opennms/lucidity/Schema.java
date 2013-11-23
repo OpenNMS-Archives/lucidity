@@ -44,6 +44,7 @@ import com.opennms.lucidity.annotations.Id;
 import com.opennms.lucidity.annotations.Index;
 import com.opennms.lucidity.annotations.OneToMany;
 import com.opennms.lucidity.annotations.Table;
+import com.opennms.lucidity.annotations.UpdateStrategy;
 
 // FIXME: support annotated methods, as well as fields.
 // FIXME: add collection types to CQL_TYPES.
@@ -150,7 +151,7 @@ class Schema {
 
             @Override
             public boolean apply(Field input) {
-                return !isCassandraCollection(input.getType());
+                return !input.isAnnotationPresent(COLLECTION);
             }
         });
     }
@@ -161,7 +162,7 @@ class Schema {
 
             @Override
             public boolean apply(Field input) {
-                return isCassandraCollection(input.getType());
+                return input.isAnnotationPresent(COLLECTION);
             }
         });
     }
@@ -253,6 +254,13 @@ class Schema {
                 checkArgument(
                         isCassandraCollection(f.getType()),
                         format("%s is an invalid type for @%s", f.getType(), COLLECTION.getCanonicalName()));
+
+                if (f.getType().equals(List.class)) {
+                    EmbeddedCollection c = f.getAnnotation(EmbeddedCollection.class);
+                    checkArgument(
+                            !c.updateStrategy().equals(UpdateStrategy.ELEMENT),
+                            format("unsupported update strategy %s for collection of type List", UpdateStrategy.ELEMENT));
+                }
 
                 String name = getColumnSchemaName(f);
 
