@@ -18,6 +18,8 @@ package com.opennms.lucidity;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
+import static com.google.common.base.Preconditions.checkState;
+import static com.google.common.base.Throwables.propagate;
 import static java.lang.String.format;
 
 import java.lang.annotation.Annotation;
@@ -35,6 +37,7 @@ import java.util.Set;
 import java.util.UUID;
 
 import com.google.common.base.Predicate;
+import com.google.common.collect.Collections2;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 import com.opennms.lucidity.annotations.Column;
@@ -55,6 +58,55 @@ import com.opennms.lucidity.annotations.UpdateStrategy;
  * @author eevans
  */
 class Schema {
+
+    static class ColumnSpec {
+        private final String m_name;
+        private final Field m_field;
+
+        ColumnSpec(String name, Field f) {
+            m_name = name;
+            m_field = f;
+        }
+
+        boolean isIndexed() {
+            return m_field.isAnnotationPresent(INDEX);
+        }
+
+        boolean isCollection() {
+            return m_field.isAnnotationPresent(COLLECTION);
+        }
+
+        UpdateStrategy getCollectionUpdateStrategy() {
+            checkState(m_field.isAnnotationPresent(COLLECTION), "Not a collection.");
+            return m_field.getAnnotation(EmbeddedCollection.class).updateStrategy();
+        }
+
+        Type[] getParameterizedTypes() {
+            checkState(m_field.isAnnotationPresent(COLLECTION), "Not a collection.");
+            return Util.getParameterizedTypes(m_field);
+        }
+
+        String getName() {
+            return m_name;
+        }
+
+        Type getType() {
+            return m_field.getType();
+        }
+
+        Object getValue(Object obj) {
+            return Util.getFieldValue(m_field, obj);
+        }
+
+        void setValue(Object obj, Object value) {
+            try {
+                m_field.set(obj, value);
+            }
+            catch (IllegalArgumentException | IllegalAccessException e) {
+                throw propagate(e);
+            }
+        }
+    }
 
     static final Class<? extends Annotation> ENTITY = Entity.class;
     static final Class<? extends Annotation> COLUMN = Column.class;
@@ -94,10 +146,10 @@ class Schema {
     private final String m_tableName;
     private final String m_idName;
     private final Field m_idField;
-    private final Map<String, Field> m_columns;
+    private final Map<String, ColumnSpec> m_columns;
     private final Map<Field, Schema> m_oneToManys;
 
-    Schema(Class<?> type, String tableName, String idName, Field idField, Map<String, Field> columns, Map<Field, Schema> oneToManys) {
+    Schema(Class<?> type, String tableName, String idName, Field idField, Map<String, ColumnSpec> columns, Map<Field, Schema> oneToManys) {
         m_type = type;
         m_tableName = tableName;
         m_idName = idName;
@@ -126,43 +178,39 @@ class Schema {
         return (UUID)Util.getFieldValue(m_idField, obj);
     }
 
-    Map<String, Field> getColumns() {
-        return m_columns;
+    Collection<ColumnSpec> getColumns() {
+        return m_columns.values();
     }
 
     Map<Field, Schema> getOneToManys() {
         return m_oneToManys;
     }
 
-    Object getColumnValue(String columnName, Object obj) {
-        return Util.getFieldValue(m_columns.get(columnName), obj);
-    }
-
     boolean isIndexed(String columnName) {
-        if (!getColumns().containsKey(columnName)) {
+        if (!m_columns.containsKey(columnName)) {
             return false;
         }
-        return getColumns().get(columnName).isAnnotationPresent(INDEX);
+        return m_columns.get(columnName).isIndexed();
     }
 
     /** Return all standard (read: non-collection) columns */
-    Map<String, Field> getStandardColumns() {
-        return Maps.filterValues(getColumns(), new Predicate<Field>() {
+    Collection<ColumnSpec> getStandardColumns() {
+        return Collections2.filter(getColumns(), new Predicate<ColumnSpec>() {
 
             @Override
-            public boolean apply(Field input) {
-                return !input.isAnnotationPresent(COLLECTION);
+            public boolean apply(ColumnSpec input) {
+                return !input.isCollection();
             }
         });
     }
 
     /** Return only collection columns (maps, lists, and sets). */
-    Map<String, Field> getCollectionColumns() {
-        return Maps.filterValues(getColumns(), new Predicate<Field>() {
+    Collection<ColumnSpec> getCollectionColumns() {
+        return Collections2.filter(getColumns(), new Predicate<ColumnSpec>() {
 
             @Override
-            public boolean apply(Field input) {
-                return input.isAnnotationPresent(COLLECTION);
+            public boolean apply(ColumnSpec input) {
+                return input.isCollection();
             }
         });
     }
@@ -173,21 +221,21 @@ class Schema {
 
         sb.append("CREATE TABLE ").append(getTableName()).append(" (").append(getIDName()).append(" uuid PRIMARY KEY");
 
-        for (Map.Entry<String, Field> entry : getColumns().entrySet()) {
-            sb.append(", ").append(entry.getKey()).append(" ").append(getCassandraTypeDDL(entry.getValue()));
+        for (ColumnSpec colSpec : getColumns()) {
+            sb.append(", ").append(colSpec.getName()).append(" ").append(getCassandraTypeDDL(colSpec));
         }
 
         sb.append(");").append(System.lineSeparator());
         
-        for (Map.Entry<String, Field> entry : getColumns().entrySet()) {
-            String columnName = entry.getKey();
+        for (ColumnSpec colSpec : getColumns()) {
+            String columnName = colSpec.getName();
             
-            if (entry.getValue().isAnnotationPresent(INDEX)) {
+            if (colSpec.isIndexed()) {
                 sb.append(format(
                         "CREATE TABLE %s (%s %s PRIMARY KEY, %s uuid);%n",
                         indexTableName(getTableName(), columnName),
                         columnName,
-                        getCassandraTypeDDL(entry.getValue()),
+                        getCassandraTypeDDL(colSpec),
                         joinColumnName(getTableName())));
             }
         }
@@ -228,7 +276,7 @@ class Schema {
 
         String idName = null;
         Field idField = null;
-        Map<String, Field> columns = Maps.newHashMap();
+        Map<String, ColumnSpec> columns = Maps.newHashMap();
         Map<Field, Schema> oneToManys = Maps.newHashMap();
 
         // Fields
@@ -274,7 +322,7 @@ class Schema {
                             format("unsupported parameter type (%s) for collection %s", t, name));
                 }
 
-                columns.put(name, f);
+                columns.put(name, new ColumnSpec(name, f));
 
             }
             // Column annotated fields
@@ -289,7 +337,7 @@ class Schema {
 
                 checkArgument(isCassandraType(f.getType()), format("invalid type: %s (%s)", f.getType(), name));
 
-                columns.put(name, f);
+                columns.put(name, new ColumnSpec(name, f));
 
             }
             // OnToMany annotated fields
@@ -338,16 +386,16 @@ class Schema {
         return COLLECTION_TYPES.contains(type);
     }
 
-    private static String getCassandraTypeDDL(Field f) {
+    private static String getCassandraTypeDDL(ColumnSpec colSpec) {
 
-        Type type = f.getType();
+        Type type = colSpec.getType();
 
         if (type.equals(Map.class)) {
-            Type[] t = Util.getParameterizedTypes(f);
+            Type[] t = colSpec.getParameterizedTypes();
             return format("%s<%s, %s>", CQL_TYPES.get(type), CQL_TYPES.get(t[0]), CQL_TYPES.get(t[1]));
         }
         else if (type.equals(Set.class) || type.equals(List.class)) {
-            return format("%s<%s>", CQL_TYPES.get(type), CQL_TYPES.get(Util.getParameterizedTypes(f)[0]));
+            return format("%s<%s>", CQL_TYPES.get(type), CQL_TYPES.get(colSpec.getParameterizedTypes()[0]));
         }
         else {
             return CQL_TYPES.get(type);

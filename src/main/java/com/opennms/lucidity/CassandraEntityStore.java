@@ -25,10 +25,8 @@ import static com.datastax.driver.core.querybuilder.QueryBuilder.set;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.base.Preconditions.checkState;
-import static com.google.common.base.Throwables.propagate;
 import static com.opennms.lucidity.Schema.ENTITY;
 import static com.opennms.lucidity.Schema.ID;
-import static com.opennms.lucidity.Schema.INDEX;
 import static com.opennms.lucidity.Schema.indexTableName;
 import static com.opennms.lucidity.Schema.joinColumnName;
 import static com.opennms.lucidity.Schema.joinTableName;
@@ -70,7 +68,7 @@ import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 import com.google.common.collect.Sets.SetView;
-import com.opennms.lucidity.annotations.EmbeddedCollection;
+import com.opennms.lucidity.Schema.ColumnSpec;
 import com.opennms.lucidity.annotations.UpdateStrategy;
 
 
@@ -136,17 +134,15 @@ public class CassandraEntityStore implements EntityStore {
         Batch batch = batch();
         Insert insertStatement = insertInto(schema.getTableName()).value(schema.getIDName(), id);
 
-        for (Entry<String, Field> entry : schema.getColumns().entrySet()) {
-            String columnName = entry.getKey();
-            Field f = entry.getValue();
+        for (ColumnSpec colSpec : schema.getColumns()) {
             
-            insertStatement.value(columnName, schema.getColumnValue(columnName, object));
+            insertStatement.value(colSpec.getName(), colSpec.getValue(object));
             
-            if (entry.getValue().isAnnotationPresent(Schema.INDEX)) {
-                String tableName = indexTableName(schema.getTableName(), columnName);
+            if (colSpec.isIndexed()) {
+                String tableName = indexTableName(schema.getTableName(), colSpec.getName());
                 batch.add(
                         insertInto(tableName)
-                            .value(columnName, Util.getFieldValue(f, object))
+                            .value(colSpec.getName(), colSpec.getValue(object))
                             .value(joinColumnName(schema.getTableName()), id)
                 );
             }
@@ -216,24 +212,22 @@ public class CassandraEntityStore implements EntityStore {
         Batch batchStatement = batch();
 
         // Begin with standard (i.e. non-collection) columns.
-        for (Entry<String, Field> entry : schema.getStandardColumns().entrySet()) {
-            String columnName = entry.getKey();
-            Field f = entry.getValue();
+        for (ColumnSpec colSpec : schema.getStandardColumns()) {
 
             Object past, current;
-            current = schema.getColumnValue(columnName, object);
-            past = record.getColumns().get(columnName);
+            current = colSpec.getValue(object);
+            past = record.getColumns().get(colSpec.getName());
 
             if (current != null && !current.equals(past)) {
                 needsUpdate = true;
-                updateStatement.with(set(columnName, current));
+                updateStatement.with(set(colSpec.getName(), current));
 
                 // Update index, if applicable
-                if (f.isAnnotationPresent(INDEX)) {
+                if (colSpec.isIndexed()) {
                     batchStatement.add(
-                            QueryBuilder.update(indexTableName(schema.getTableName(), columnName))
+                            QueryBuilder.update(indexTableName(schema.getTableName(), colSpec.getName()))
                                     .with(set(joinColumnName(schema.getTableName()), schema.getIDValue(object)))
-                                    .where(eq(columnName, schema.getColumnValue(columnName, object)))
+                                    .where(eq(colSpec.getName(), colSpec.getValue(object)))
                     );
                 }
             }
@@ -246,21 +240,18 @@ public class CassandraEntityStore implements EntityStore {
         }
 
         // Next, collection columns ...
-        for (Entry<String, Field> entry : schema.getCollectionColumns().entrySet()) {
-            String columnName = entry.getKey();
-            Field f = entry.getValue();
+        for (ColumnSpec colSpec : schema.getCollectionColumns()) {
 
             Object past, current;
-            current = schema.getColumnValue(columnName, object);
-            past = record.getColumns().get(columnName);
+            current = colSpec.getValue(object);
+            past = record.getColumns().get(colSpec.getName());
 
             if (current != null && !current.equals(past)) {
-                EmbeddedCollection collection = f.getAnnotation(EmbeddedCollection.class);
 
-                if (collection.updateStrategy().equals(UpdateStrategy.ELEMENT)) {
+                if (colSpec.getCollectionUpdateStrategy().equals(UpdateStrategy.ELEMENT)) {
                     Collection<RegularStatement> statements = diffCollection(
                             schema.getTableName(),
-                            columnName,
+                            colSpec.getName(),
                             eq(schema.getIDName(), schema.getIDValue(object)),
                             past,
                             current);
@@ -271,7 +262,7 @@ public class CassandraEntityStore implements EntityStore {
                 else {
                     batchStatement.add(
                             insertInto(schema.getTableName())
-                                .value(columnName, current)
+                                .value(colSpec.getName(), current)
                                 .value(schema.getIDName(), schema.getIDValue(object))
                     );
                 }
@@ -424,8 +415,8 @@ public class CassandraEntityStore implements EntityStore {
 
         Util.setFieldValue(schema.getIDField(), instance, row.getUUID(schema.getIDName()));
 
-        for (String columnName : schema.getColumns().keySet()) {
-            setColumn(instance, columnName, schema.getColumns().get(columnName), row);
+        for (ColumnSpec colSpec : schema.getColumns()) {
+            setColumn(instance, colSpec, row);
         }
         
         for (Map.Entry<Field, Schema> entry : schema.getOneToManys().entrySet()) {
@@ -496,8 +487,8 @@ public class CassandraEntityStore implements EntityStore {
         Schema schema = getSchema(inst);
         Record record = new Record(schema.getIDValue(inst));
 
-        for (String columnName : schema.getColumns().keySet()) {
-            record.putColumn(columnName, copyOf(schema.getColumnValue(columnName, inst)));
+        for (ColumnSpec colSpec : schema.getColumns()) {
+            record.putColumn(colSpec.getName(), copyOf(colSpec.getValue(inst)));
         }
 
         for (Field f : schema.getOneToManys().keySet()) {
@@ -524,58 +515,53 @@ public class CassandraEntityStore implements EntityStore {
         }
     }
 
-    private void setColumn(Object obj, String name, Field f, Row data) {
+    private void setColumn(Object obj, ColumnSpec colSpec, Row data) {
 
-        try {
-            if (f.getType().equals(Boolean.TYPE)) {
-                f.set(obj, data.getBool(name));
-            }
-            else if (f.getType().equals(BigDecimal.class)) {
-                f.set(obj, data.getDecimal(name));
-            }
-            else if (f.getType().equals(BigInteger.class)) {
-                f.set(obj, data.getVarint(name));
-            }
-            else if (f.getType().equals(Date.class)) {
-                f.set(obj, data.getDate(name));
-            }
-            else if (f.getType().equals(Double.TYPE)) {
-                f.set(obj, data.getDouble(name));
-            }
-            else if (f.getType().equals(Float.TYPE)) {
-                f.set(obj, data.getFloat(name));
-            }
-            else if (f.getType().equals(InetAddress.class)) {
-                f.set(obj, data.getInet(name));
-            }
-            else if (f.getType().equals(Integer.TYPE)) {
-                f.set(obj, data.getInt(name));
-            }
-            else if (f.getType().equals(List.class)) {
-                f.set(obj, data.getList(name, (Class<?>)Util.getParameterizedTypes(f)[0]));
-            }
-            else if (f.getType().equals(Long.TYPE)) {
-                f.set(obj, data.getLong(name));
-            }
-            else if (f.getType().equals(Map.class)) {
-                Type[] types = Util.getParameterizedTypes(f);
-                f.set(obj, data.getMap(name, (Class<?>)types[0], (Class<?>)types[1]));
-            }
-            else if (f.getType().equals(Set.class)) {
-                f.set(obj, data.getSet(name, (Class<?>)Util.getParameterizedTypes(f)[0]));
-            }
-            else if (f.getType().equals(String.class)) {
-                f.set(obj, data.getString(name));
-            }
-            else if (f.getType().equals(UUID.class)) {
-                f.set(obj, data.getUUID(name));
-            }
-            else {
-                throw new IllegalArgumentException(format("Unsupported field type %s", f.getType()));
-            }
+        if (colSpec.getType().equals(Boolean.TYPE)) {
+            colSpec.setValue(obj, data.getBool(colSpec.getName()));
         }
-        catch (IllegalArgumentException | IllegalAccessException e) {
-            throw propagate(e);
+        else if (colSpec.getType().equals(BigDecimal.class)) {
+            colSpec.setValue(obj, data.getDecimal(colSpec.getName()));
+        }
+        else if (colSpec.getType().equals(BigInteger.class)) {
+            colSpec.setValue(obj, data.getVarint(colSpec.getName()));
+        }
+        else if (colSpec.getType().equals(Date.class)) {
+            colSpec.setValue(obj, data.getDate(colSpec.getName()));
+        }
+        else if (colSpec.getType().equals(Double.TYPE)) {
+            colSpec.setValue(obj, data.getDouble(colSpec.getName()));
+        }
+        else if (colSpec.getType().equals(Float.TYPE)) {
+            colSpec.setValue(obj, data.getFloat(colSpec.getName()));
+        }
+        else if (colSpec.getType().equals(InetAddress.class)) {
+            colSpec.setValue(obj, data.getInet(colSpec.getName()));
+        }
+        else if (colSpec.getType().equals(Integer.TYPE)) {
+            colSpec.setValue(obj, data.getInt(colSpec.getName()));
+        }
+        else if (colSpec.getType().equals(List.class)) {
+            colSpec.setValue(obj, data.getList(colSpec.getName(), (Class<?>) colSpec.getParameterizedTypes()[0]));
+        }
+        else if (colSpec.getType().equals(Long.TYPE)) {
+            colSpec.setValue(obj, data.getLong(colSpec.getName()));
+        }
+        else if (colSpec.getType().equals(Map.class)) {
+            Type[] types = colSpec.getParameterizedTypes();
+            colSpec.setValue(obj, data.getMap(colSpec.getName(), (Class<?>) types[0], (Class<?>) types[1]));
+        }
+        else if (colSpec.getType().equals(Set.class)) {
+            colSpec.setValue(obj, data.getSet(colSpec.getName(), (Class<?>) colSpec.getParameterizedTypes()[0]));
+        }
+        else if (colSpec.getType().equals(String.class)) {
+            colSpec.setValue(obj, data.getString(colSpec.getName()));
+        }
+        else if (colSpec.getType().equals(UUID.class)) {
+            colSpec.setValue(obj, data.getUUID(colSpec.getName()));
+        }
+        else {
+            throw new IllegalArgumentException(format("Unsupported field type %s", colSpec.getType()));
         }
 
     }
@@ -597,13 +583,10 @@ public class CassandraEntityStore implements EntityStore {
                 .where(eq(schema.getIDName(), schema.getIDValue(obj))));
 
         // Remove index entries
-        for (Entry<String, Field> entry : schema.getColumns().entrySet()) {
-            String columnName = entry.getKey();
-            Field f = entry.getValue();
-
-            if (f.isAnnotationPresent(INDEX)) {
-                String tableName = indexTableName(schema.getTableName(), columnName);
-                batchStatement.add(QueryBuilder.delete().from(tableName).where(eq(columnName, Util.getFieldValue(f, obj))));
+        for (ColumnSpec colSpec : schema.getColumns()) {
+            if (colSpec.isIndexed()) {
+                String tableName = indexTableName(schema.getTableName(), colSpec.getName());
+                batchStatement.add(QueryBuilder.delete().from(tableName).where(eq(colSpec.getName(), colSpec.getValue(obj))));
             }
         }
 
