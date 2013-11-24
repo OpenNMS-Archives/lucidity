@@ -126,13 +126,13 @@ public class CassandraEntityStore implements EntityStore {
         Schema schema = getSchema(object);
 
         checkArgument(
-                schema.getIDValue(object) == null,
+                schema.getID().getValue(object) == null,
                 format("property annotated with @%s must be null", ID.getCanonicalName()));
 
         // Object persistence (incl. indices)
         UUID id = UUID.randomUUID();
         Batch batch = batch();
-        Insert insertStatement = insertInto(schema.getTableName()).value(schema.getIDName(), id);
+        Insert insertStatement = insertInto(schema.getTableName()).value(schema.getID().getName(), id);
 
         for (ColumnSpec colSpec : schema.getColumns()) {
             
@@ -161,7 +161,7 @@ public class CassandraEntityStore implements EntityStore {
             }
 
             for (Object item : (Collection<?>) relations) {
-                UUID relationID = (UUID) s.getIDValue(item);
+                UUID relationID = (UUID) s.getID().getValue(item);
 
                 if (relationID == null) {
                     throw new IllegalStateException(
@@ -181,7 +181,7 @@ public class CassandraEntityStore implements EntityStore {
 
         executeStatement(batch, consistency);
 
-        Util.setFieldValue(schema.getIDField(), object, id);
+        schema.getID().setValue(object, id);
         cacheInstance(object);
         
         return object;
@@ -226,14 +226,14 @@ public class CassandraEntityStore implements EntityStore {
                 if (colSpec.isIndexed()) {
                     batchStatement.add(
                             QueryBuilder.update(indexTableName(schema.getTableName(), colSpec.getName()))
-                                    .with(set(joinColumnName(schema.getTableName()), schema.getIDValue(object)))
+                                    .with(set(joinColumnName(schema.getTableName()), schema.getID().getValue(object)))
                                     .where(eq(colSpec.getName(), colSpec.getValue(object)))
                     );
                 }
             }
         }
 
-        updateStatement.where(eq(schema.getIDName(), schema.getIDValue(object)));
+        updateStatement.where(eq(schema.getID().getName(), schema.getID().getValue(object)));
 
         if (needsUpdate) {
             batchStatement.add(updateStatement);
@@ -252,7 +252,7 @@ public class CassandraEntityStore implements EntityStore {
                     Collection<RegularStatement> statements = diffCollection(
                             schema.getTableName(),
                             colSpec.getName(),
-                            eq(schema.getIDName(), schema.getIDValue(object)),
+                            eq(schema.getID().getName(), schema.getID().getValue(object)),
                             past,
                             current);
                     for (RegularStatement statement : statements) {
@@ -263,7 +263,7 @@ public class CassandraEntityStore implements EntityStore {
                     batchStatement.add(
                             insertInto(schema.getTableName())
                                 .value(colSpec.getName(), current)
-                                .value(schema.getIDName(), schema.getIDValue(object))
+                                .value(schema.getID().getName(), schema.getID().getValue(object))
                     );
                 }
 
@@ -294,24 +294,24 @@ public class CassandraEntityStore implements EntityStore {
             String joinTable = joinTableName(schema.getTableName(), s.getTableName());
 
             for (Object o : toInsert) {
-                if (s.getIDValue(o) == null) {
+                if (s.getID().getValue(o) == null) {
                     throw new IllegalStateException(
                             "encountered relation with null ID property (entity not persisted?)");
                 }
                 batchStatement.add(insertInto(joinTable)
-                        .value(joinColumnName(schema.getTableName()), schema.getIDValue(object))
-                        .value(joinColumnName(s.getTableName()), s.getIDValue(o)));
+                        .value(joinColumnName(schema.getTableName()), schema.getID().getValue(object))
+                        .value(joinColumnName(s.getTableName()), s.getID().getValue(o)));
             }
 
             for (Object o : toRemove) {
-                if (s.getIDValue(o) == null) {
+                if (s.getID().getValue(o) == null) {
                     throw new IllegalStateException(
                             "encountered relation with null ID property (entity not persisted?)");
                 }
                 batchStatement.add(
                         QueryBuilder.delete().from(joinTable)
-                            .where(eq(joinColumnName(schema.getTableName()), schema.getIDValue(object)))
-                                .and(eq(joinColumnName(s.getTableName()), s.getIDValue(o)))
+                            .where(eq(joinColumnName(schema.getTableName()), schema.getID().getValue(object)))
+                                .and(eq(joinColumnName(s.getTableName()), s.getID().getValue(o)))
                 );
             }
         }
@@ -405,7 +405,7 @@ public class CassandraEntityStore implements EntityStore {
         T instance = Util.newInstance(cls);
 
         Schema schema = getSchema(instance);
-        Statement selectStatement = select().from(schema.getTableName()).where(eq(schema.getIDName(), id));
+        Statement selectStatement = select().from(schema.getTableName()).where(eq(schema.getID().getName(), id));
         selectStatement.setConsistencyLevel(getDriverConsistencyLevel(consistency));
         ResultSet results = executeStatement(selectStatement, consistency);
         Row row = results.one();
@@ -413,7 +413,7 @@ public class CassandraEntityStore implements EntityStore {
         checkState(results.isExhausted(), "query returned more than one row");
         if (row == null) return Optional.absent();
 
-        Util.setFieldValue(schema.getIDField(), instance, row.getUUID(schema.getIDName()));
+        schema.getID().setValue(instance, row.getUUID(schema.getID().getName()));
 
         for (ColumnSpec colSpec : schema.getColumns()) {
             setColumn(instance, colSpec, row);
@@ -485,7 +485,7 @@ public class CassandraEntityStore implements EntityStore {
 
     private <T> void cacheInstance(T inst) {
         Schema schema = getSchema(inst);
-        Record record = new Record(schema.getIDValue(inst));
+        Record record = new Record(schema.getID().getValue(inst));
 
         for (ColumnSpec colSpec : schema.getColumns()) {
             record.putColumn(colSpec.getName(), copyOf(colSpec.getValue(inst)));
@@ -580,7 +580,7 @@ public class CassandraEntityStore implements EntityStore {
 
         Schema schema = getSchema(obj);
         Batch batchStatement = batch(QueryBuilder.delete().from(schema.getTableName())
-                .where(eq(schema.getIDName(), schema.getIDValue(obj))));
+                .where(eq(schema.getID().getName(), schema.getID().getValue(obj))));
 
         // Remove index entries
         for (ColumnSpec colSpec : schema.getColumns()) {
@@ -595,7 +595,7 @@ public class CassandraEntityStore implements EntityStore {
             String joinTable = joinTableName(schema.getTableName(), s.getTableName());
             batchStatement.add(
                     QueryBuilder.delete().from(joinTable)
-                        .where(eq(joinColumnName(schema.getTableName()), schema.getIDValue(obj)))
+                        .where(eq(joinColumnName(schema.getTableName()), schema.getID().getValue(obj)))
             );
         }
 

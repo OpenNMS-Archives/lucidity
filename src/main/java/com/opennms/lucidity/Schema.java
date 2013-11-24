@@ -59,6 +59,29 @@ import com.opennms.lucidity.annotations.UpdateStrategy;
  */
 class Schema {
 
+    static class IdSpec {
+        private final String m_name;
+        private final Field m_field;
+
+        IdSpec(String name, Field f) {
+            m_name = name;
+            m_field = f;
+        }
+
+        String getName() {
+            return m_name;
+        }
+
+        UUID getValue(Object obj) {
+            return (UUID) Util.getFieldValue(m_field, obj);
+        }
+
+        void setValue(Object obj, Object value) {
+            Util.setFieldValue(m_field, obj, value);
+        }
+
+    }
+
     static class ColumnSpec {
         private final String m_name;
         private final Field m_field;
@@ -144,16 +167,14 @@ class Schema {
 
     private final Class<?> m_type;
     private final String m_tableName;
-    private final String m_idName;
-    private final Field m_idField;
+    private final IdSpec m_idSpec;
     private final Map<String, ColumnSpec> m_columns;
     private final Map<Field, Schema> m_oneToManys;
 
-    Schema(Class<?> type, String tableName, String idName, Field idField, Map<String, ColumnSpec> columns, Map<Field, Schema> oneToManys) {
+    Schema(Class<?> type, String tableName, IdSpec idSpec, Map<String, ColumnSpec> columns, Map<Field, Schema> oneToManys) {
         m_type = type;
         m_tableName = tableName;
-        m_idName = idName;
-        m_idField = idField;
+        m_idSpec = idSpec;
         m_columns = columns;
         m_oneToManys = oneToManys;
     }
@@ -166,16 +187,8 @@ class Schema {
         return m_tableName;
     }
 
-    String getIDName() {
-        return m_idName;
-    }
-
-    Field getIDField() {
-        return m_idField;
-    }
-
-    UUID getIDValue(Object obj) {
-        return (UUID)Util.getFieldValue(m_idField, obj);
+    IdSpec getID() {
+        return m_idSpec;
     }
 
     Collection<ColumnSpec> getColumns() {
@@ -219,7 +232,7 @@ class Schema {
 
         StringBuilder sb = new StringBuilder();
 
-        sb.append("CREATE TABLE ").append(getTableName()).append(" (").append(getIDName()).append(" uuid PRIMARY KEY");
+        sb.append("CREATE TABLE ").append(getTableName()).append(" (").append(getID().getName()).append(" uuid PRIMARY KEY");
 
         for (ColumnSpec colSpec : getColumns()) {
             sb.append(", ").append(colSpec.getName()).append(" ").append(getCassandraTypeDDL(colSpec));
@@ -367,7 +380,7 @@ class Schema {
                     String.format("At least one non-Id field must be annotated with @%s", COLUMN.getCanonicalName()));
         }
 
-        return new Schema(cls, tableName, idName, idField, columns, oneToManys);
+        return new Schema(cls, tableName, new IdSpec(idName, idField), columns, oneToManys);
     }
 
     static String joinColumnName(String tableName) {
