@@ -19,7 +19,6 @@ package com.opennms.lucidity;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.base.Preconditions.checkState;
-import static com.google.common.base.Throwables.propagate;
 import static java.lang.String.format;
 
 import java.lang.annotation.Annotation;
@@ -38,6 +37,7 @@ import java.util.UUID;
 
 import com.google.common.base.Predicate;
 import com.google.common.collect.Collections2;
+import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 import com.opennms.lucidity.annotations.Column;
@@ -58,6 +58,33 @@ import com.opennms.lucidity.annotations.UpdateStrategy;
  * @author eevans
  */
 class Schema {
+
+    static class OneToManySpec {
+        private final Field m_field;
+        private final Schema m_schema;
+
+        OneToManySpec(Field f, Schema s) {
+            m_field = f;
+            m_schema = s;
+        }
+
+        String getName() {
+            return m_field.getName();
+        }
+
+        Schema getSchema() {
+            return m_schema;
+        }
+
+        Collection<?> getValue(Object obj) {
+            return (Collection<?>)Util.getFieldValue(m_field, obj);
+        }
+
+        void setValue(Object obj, Collection<?> value) {
+            Util.setFieldValue(m_field, obj, value);
+        }
+
+    }
 
     static class IdSpec {
         private final String m_name;
@@ -122,12 +149,7 @@ class Schema {
         }
 
         void setValue(Object obj, Object value) {
-            try {
-                m_field.set(obj, value);
-            }
-            catch (IllegalArgumentException | IllegalAccessException e) {
-                throw propagate(e);
-            }
+            Util.setFieldValue(m_field, obj, value);
         }
     }
 
@@ -169,14 +191,14 @@ class Schema {
     private final String m_tableName;
     private final IdSpec m_idSpec;
     private final Map<String, ColumnSpec> m_columns;
-    private final Map<Field, Schema> m_oneToManys;
+    private final Collection<OneToManySpec> m_oneToManysNg;
 
-    Schema(Class<?> type, String tableName, IdSpec idSpec, Map<String, ColumnSpec> columns, Map<Field, Schema> oneToManys) {
+    Schema(Class<?> type, String tableName, IdSpec idSpec, Map<String, ColumnSpec> columns, Collection<OneToManySpec> oneToManysNg) {
         m_type = type;
         m_tableName = tableName;
         m_idSpec = idSpec;
         m_columns = columns;
-        m_oneToManys = oneToManys;
+        m_oneToManysNg = oneToManysNg;
     }
 
     Class<?> getObjectType() {
@@ -195,8 +217,8 @@ class Schema {
         return m_columns.values();
     }
 
-    Map<Field, Schema> getOneToManys() {
-        return m_oneToManys;
+    Collection<OneToManySpec> getOneToManys() {
+        return m_oneToManysNg;
     }
 
     boolean isIndexed(String columnName) {
@@ -253,7 +275,8 @@ class Schema {
             }
         }
 
-        for (Schema s : getOneToManys().values()) {
+        for (OneToManySpec relSpec : getOneToManys()) {
+            Schema s = relSpec.getSchema();
             sb.append(format(
                     "CREATE TABLE %s (%s uuid, %s uuid, PRIMARY KEY(%s, %s));%n",
                     joinTableName(getTableName(), s.getTableName()),
@@ -290,7 +313,7 @@ class Schema {
         String idName = null;
         Field idField = null;
         Map<String, ColumnSpec> columns = Maps.newHashMap();
-        Map<Field, Schema> oneToManys = Maps.newHashMap();
+        Collection<OneToManySpec> oneToManys = Lists.newArrayList();
 
         // Fields
         for (Field f : cls.getDeclaredFields()) {
@@ -363,7 +386,7 @@ class Schema {
                 }
 
                 Type type = ((ParameterizedType)f.getGenericType()).getActualTypeArguments()[0];
-                oneToManys.put(f, fromClass((Class<?>)type));
+                oneToManys.add(new OneToManySpec(f, fromClass((Class<?>)type)));
 
             }
 

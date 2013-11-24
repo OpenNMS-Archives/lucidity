@@ -33,7 +33,6 @@ import static com.opennms.lucidity.Schema.joinTableName;
 import static java.lang.String.format;
 
 import java.io.IOException;
-import java.lang.reflect.Field;
 import java.lang.reflect.Type;
 import java.math.BigDecimal;
 import java.math.BigInteger;
@@ -69,6 +68,7 @@ import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 import com.google.common.collect.Sets.SetView;
 import com.opennms.lucidity.Schema.ColumnSpec;
+import com.opennms.lucidity.Schema.OneToManySpec;
 import com.opennms.lucidity.annotations.UpdateStrategy;
 
 
@@ -151,10 +151,10 @@ public class CassandraEntityStore implements EntityStore {
         batch.add(insertStatement);
 
         // One-to-Many relationship persistence
-        for (Map.Entry<Field, Schema> entry : schema.getOneToManys().entrySet()) {
-            Schema s = entry.getValue();
+        for (OneToManySpec relationSpec : schema.getOneToManys()) {
+            Schema s = relationSpec.getSchema();
 
-            Object relations = Util.getFieldValue(entry.getKey(), object);
+            Object relations = relationSpec.getValue(object);
 
             if (relations == null) {
                 continue;
@@ -272,13 +272,12 @@ public class CassandraEntityStore implements EntityStore {
         }
 
         // Finally, process one-to-many mappings
-        for (Map.Entry<Field, Schema> entry : schema.getOneToManys().entrySet()) {
-            Field f = entry.getKey();
-            Schema s = entry.getValue();
+        for (OneToManySpec relSpec : schema.getOneToManys()) {
+            Schema s = relSpec.getSchema();
 
             Collection<?> past, current;
-            current = (Collection<?>)Util.getFieldValue(f, object);
-            past = (record != null) ? record.getOneToManys().get(f) : null;
+            current = relSpec.getValue(object);
+            past = (record != null) ? record.getOneToManys().get(relSpec.getName()) : null;
 
             if (current == null) {
                 current = Collections.emptySet();
@@ -419,9 +418,8 @@ public class CassandraEntityStore implements EntityStore {
             setColumn(instance, colSpec, row);
         }
         
-        for (Map.Entry<Field, Schema> entry : schema.getOneToManys().entrySet()) {
-            
-            Schema s = entry.getValue();
+        for (OneToManySpec relSpec : schema.getOneToManys()) {
+            Schema s = relSpec.getSchema();
             Collection<Object> relations = Lists.newArrayList();
             String joinTable = joinTableName(schema.getTableName(), s.getTableName());
             Statement statement = select().from(joinTable).where(eq(joinColumnName(schema.getTableName()), id));
@@ -441,7 +439,7 @@ public class CassandraEntityStore implements EntityStore {
 
             }
 
-            Util.setFieldValue(entry.getKey(), instance, relations);
+            relSpec.setValue(instance, relations);
 
         }
 
@@ -491,9 +489,9 @@ public class CassandraEntityStore implements EntityStore {
             record.putColumn(colSpec.getName(), copyOf(colSpec.getValue(inst)));
         }
 
-        for (Field f : schema.getOneToManys().keySet()) {
-            Collection<?> relations = (Collection<?>) Util.getFieldValue(f, inst);
-            record.putOneToMany(f, (relations != null) ? Lists.newArrayList(relations) : null);
+        for (OneToManySpec relSpec : schema.getOneToManys()) {
+            Collection<?> relations = relSpec.getValue(inst);
+            record.putOneToMany(relSpec.getName(), (relations != null) ? Lists.newArrayList(relations) : null);
         }
 
         m_instanceCache.put(getInstanceID(inst), record);
@@ -591,8 +589,8 @@ public class CassandraEntityStore implements EntityStore {
         }
 
         // Remove one-to-many relationships
-        for (Schema s : schema.getOneToManys().values()) {
-            String joinTable = joinTableName(schema.getTableName(), s.getTableName());
+        for (OneToManySpec relSpec : schema.getOneToManys()) {
+            String joinTable = joinTableName(schema.getTableName(), relSpec.getSchema().getTableName());
             batchStatement.add(
                     QueryBuilder.delete().from(joinTable)
                         .where(eq(joinColumnName(schema.getTableName()), schema.getID().getValue(obj)))

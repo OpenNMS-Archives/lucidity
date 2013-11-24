@@ -16,7 +16,6 @@
 package com.opennms.lucidity;
 
 
-import java.lang.reflect.Field;
 import java.util.Collection;
 import java.util.Map;
 
@@ -27,7 +26,7 @@ class Record {
 
     Object m_idValue;
     Map<String, Object> m_columns = Maps.newHashMap();
-    Map<Field, Collection<?>> m_oneToManys = Maps.newHashMap();
+    Map<String, Collection<?>> m_oneToManys = Maps.newHashMap();
 
     Record(Object idValue) {
         m_idValue = idValue;
@@ -45,12 +44,12 @@ class Record {
         m_columns.put(name, value);
     }
 
-    Map<Field, Collection<?>> getOneToManys() {
+    Map<String, Collection<?>> getOneToManys() {
         return m_oneToManys;
     }
 
-    void putOneToMany(Field field, Collection<?> relations) {
-        m_oneToManys.put(field, relations);
+    void putOneToMany(String name, Collection<?> relations) {
+        m_oneToManys.put(name, relations);
     }
 
 }
