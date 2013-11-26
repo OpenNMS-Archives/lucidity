@@ -22,6 +22,7 @@ package com.opennms.lucidity;
 
 
 import java.io.Closeable;
+import java.util.Collection;
 import java.util.UUID;
 
 import com.google.common.base.Optional;
@@ -96,7 +97,7 @@ public interface EntityStore extends Closeable {
     <T> Optional<T> read(Class<T> cls, UUID id, ConsistencyLevel consistency);
 
     /**
-     * Read an object by an indexed value, using the default consistency level.
+     * Read objects by an indexed value, using the default consistency level.
      * 
      * @param cls
      *            class of the object to read
@@ -104,12 +105,12 @@ public interface EntityStore extends Closeable {
      *            name of the indexed column
      * @param value
      *            value the column is expected to match
-     * @return an {@link Optional} of the requested object.
+     * @return a {@link Collection} of the requested objects.
      */
-    <T> Optional<T> read(Class<T> cls, String indexedName, Object value);
+    <T> Collection<T> read(Class<T> cls, String indexedName, Object value);
 
     /**
-     * Read an object by an indexed value, with the specified consistency level.
+     * Read objects by an indexed value, with the specified consistency level.
      * 
      * @param cls
      *            class of the object to read
@@ -117,9 +118,9 @@ public interface EntityStore extends Closeable {
      *            name of the indexed column
      * @param value
      *            value the column is expected to match
-     * @return an {@link Optional} of the requested object.
+     * @return a {@link Collection} of the requested objects.
      */
-    <T> Optional<T> read(Class<T> cls, String indexedName, Object value, ConsistencyLevel consistency);
+    <T> Collection<T> read(Class<T> cls, String indexedName, Object value, ConsistencyLevel consistency);
 
     /**
      * Delete an object using the default consistency level.

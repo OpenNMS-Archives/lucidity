@@ -225,9 +225,14 @@ public class CassandraEntityStore implements EntityStore {
                 // Update index, if applicable
                 if (colSpec.isIndexed()) {
                     batchStatement.add(
-                            QueryBuilder.update(indexTableName(schema.getTableName(), colSpec.getName()))
-                                    .with(set(joinColumnName(schema.getTableName()), schema.getID().getValue(object)))
-                                    .where(eq(colSpec.getName(), colSpec.getValue(object)))
+                            insertInto(indexTableName(schema.getTableName(), colSpec.getName()))
+                                .value(colSpec.getName(), colSpec.getValue(object))
+                                .value(joinColumnName(schema.getTableName()), schema.getID().getValue(object))
+                    );
+                    batchStatement.add(
+                            QueryBuilder.delete().from(indexTableName(schema.getTableName(), colSpec.getName()))
+                                .where(eq(colSpec.getName(), past))
+                                .and(eq(joinColumnName(schema.getTableName()), schema.getID().getValue(object)))
                     );
                 }
             }
@@ -449,12 +454,12 @@ public class CassandraEntityStore implements EntityStore {
     }
 
     @Override
-    public <T> Optional<T> read(Class<T> cls, String indexedName, Object value) {
+    public <T> Collection<T> read(Class<T> cls, String indexedName, Object value) {
         return read(cls, indexedName, value, m_consistency);
     }
 
     @Override
-    public <T> Optional<T> read(Class<T> cls, String indexedName, Object value, ConsistencyLevel consistency) {
+    public <T> Collection<T> read(Class<T> cls, String indexedName, Object value, ConsistencyLevel consistency) {
 
         checkNotNull(cls, "class argument");
         checkNotNull(indexedName, "indexedName argument");
@@ -472,13 +477,14 @@ public class CassandraEntityStore implements EntityStore {
 
         Statement selectStatement = select(joinColumnName(schema.getTableName())).from(indexTableName(schema.getTableName(), indexedName)).where(eq(indexedName, value));
         selectStatement.setConsistencyLevel(getDriverConsistencyLevel(consistency));
-        ResultSet results = executeStatement(selectStatement, consistency);
-        Row row = results.one();
+        List<T> results = Lists.newArrayList();
 
-        checkState(results.isExhausted(), "query returned more than one row");
-        if (row == null) return Optional.absent();
+        for (Row row : executeStatement(selectStatement, consistency)) {
+            Optional<T> optional = read(cls, row.getUUID(joinColumnName(schema.getTableName())), consistency);
+            if (optional.isPresent()) results.add(optional.get());
+        }
 
-        return read(cls, row.getUUID(joinColumnName(schema.getTableName())), consistency);
+        return results;
     }
 
     private <T> void cacheInstance(T inst) {
@@ -584,7 +590,10 @@ public class CassandraEntityStore implements EntityStore {
         for (ColumnSpec colSpec : schema.getColumns()) {
             if (colSpec.isIndexed()) {
                 String tableName = indexTableName(schema.getTableName(), colSpec.getName());
-                batchStatement.add(QueryBuilder.delete().from(tableName).where(eq(colSpec.getName(), colSpec.getValue(obj))));
+                Clause columnClause = eq(colSpec.getName(), colSpec.getValue(obj));
+                Clause idClause = eq(joinColumnName(schema.getTableName()), schema.getID().getValue(obj));
+
+                batchStatement.add(QueryBuilder.delete().from(tableName).where(columnClause).and(idClause));
             }
         }
 

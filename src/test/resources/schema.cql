@@ -20,5 +20,5 @@ CREATE TABLE lucidity_test.users (
 );
 
 CREATE TABLE lucidity_test.addresses (id uuid PRIMARY KEY, zipcode text, street text, city text);
-CREATE TABLE lucidity_test.users_email_idx (email text PRIMARY KEY, users_id uuid);
+CREATE TABLE lucidity_test.users_email_idx (email text, users_id uuid, PRIMARY KEY(email, users_id));
 CREATE TABLE lucidity_test.users_addresses (users_id uuid, addresses_id uuid, PRIMARY KEY(users_id, addresses_id));

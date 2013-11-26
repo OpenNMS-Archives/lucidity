@@ -267,10 +267,12 @@ class Schema {
             
             if (colSpec.isIndexed()) {
                 sb.append(format(
-                        "CREATE TABLE %s (%s %s PRIMARY KEY, %s uuid);%n",
+                        "CREATE TABLE %s (%s %s, %s uuid, PRIMARY KEY(%s, %s));%n",
                         indexTableName(getTableName(), columnName),
                         columnName,
                         getCassandraTypeDDL(colSpec),
+                        joinColumnName(getTableName()),
+                        columnName,
                         joinColumnName(getTableName())));
             }
         }

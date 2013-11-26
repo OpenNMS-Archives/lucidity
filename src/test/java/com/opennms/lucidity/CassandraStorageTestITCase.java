@@ -23,6 +23,7 @@ import static org.junit.Assert.assertTrue;
 
 import java.io.IOException;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.Date;
 import java.util.Set;
 import java.util.UUID;
@@ -33,9 +34,6 @@ import org.junit.Test;
 import com.google.common.base.Optional;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
-import com.opennms.lucidity.CassandraEntityStoreFactory;
-import com.opennms.lucidity.ConsistencyLevel;
-import com.opennms.lucidity.EntityStore;
 
 
 // FIXME: Ensure tests cover properties of all supported types.
@@ -236,10 +234,10 @@ public class CassandraStorageTestITCase {
 
         persistSampleUser();
 
-        User read = get(m_entityStore.read(User.class, "email", m_sampleUser.getEmail()));
+        Collection<User> users = m_entityStore.read(User.class, "email", m_sampleUser.getEmail());
+        User user = getUser(users, m_sampleUser.getId());
 
-        assertEquals(m_sampleUser.getId(), read.getId());
-        assertEquals(m_sampleUser.getEmail(), read.getEmail());
+        assertEquals(m_sampleUser.getEmail(), user.getEmail());
 
     }
 
@@ -251,15 +249,15 @@ public class CassandraStorageTestITCase {
     @Test
     public void testUpdateIndexedColumn() {
 
-        User user = persistSampleUser();
+        User before = persistSampleUser();
 
         m_sampleUser.setEmail("root@matrix.com");
-        m_entityStore.update(user);
+        m_entityStore.update(before);
 
-        User read = get(m_entityStore.read(User.class, "email", m_sampleUser.getEmail()));
+        Collection<User> users = m_entityStore.read(User.class, "email", m_sampleUser.getEmail());
+        User after = getUser(users, m_sampleUser.getId());
 
-        assertEquals(m_sampleUser.getId(), read.getId());
-        assertEquals(m_sampleUser.getEmail(), read.getEmail());
+        assertEquals(m_sampleUser.getEmail(), after.getEmail());
 
     }
 
@@ -410,9 +408,38 @@ public class CassandraStorageTestITCase {
 
     }
 
+    @Test
+    public void testDeleteWithIndexes() {
+
+        User user = m_entityStore.create(new User("Meg", "Griffin", "meg@fox.com"));
+        m_entityStore.create(new User("M.", "Griffin", "meg@fox.com"));
+
+        assertEquals(2, m_entityStore.read(User.class, "email", "meg@fox.com").size());
+
+        m_entityStore.delete(user);
+
+        assertEquals(1, m_entityStore.read(User.class, "email", "meg@fox.com").size());
+
+    }
+
     private User persistSampleUser() {
         for (Address a : m_sampleAddresses) m_entityStore.create(a);
         return m_entityStore.create(m_sampleUser);
+    }
+
+    private User getUser(Collection<User> users, UUID id) {
+        User result = null;
+
+        for (User user : users) {
+            if (user.getId().equals(id)) {
+                result = user;
+                break;
+            }
+        }
+
+        assertNotNull("User lookup failed", result);
+
+        return result;
     }
 
     private <T> T get(Optional<T> ref) {
